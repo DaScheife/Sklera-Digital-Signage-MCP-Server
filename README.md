@@ -15,6 +15,10 @@ Versionshistorie siehe `CHANGELOG.md`.
 
 Für die Nutzung der Sklera Digital Signage API (REST API) sind grundsätzlich drei Punkte notwendig:
 
+- Der Channel für den die API genutzt werden soll hat das Lizenzmodell sklera Standard oder sklera Professional
+- Ein sklera Benutzer der für den Zugriff auf den Channel berechtigt ist
+- Die Generierung eines API Tokens für den Benutzer
+
 Der Channel für den die API genutzt werden soll hat das Lizenzmodell sklera Standard oder sklera Professional
 Ein sklera Benutzer der für den Zugriff auf den Channel berechtigt ist
 Die Generierung eines API Tokens für den Benutzer
