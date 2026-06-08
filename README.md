@@ -11,6 +11,22 @@ Versionshistorie siehe `CHANGELOG.md`.
 - Node.js >= 18
 - Sklera API-Token (Manager-Rolle oder höher)
 
+## Sklera API Overview
+
+Für die Nutzung der Sklera Digital Signage API (REST API) sind grundsätzlich drei Punkte notwendig:
+
+Der Channel für den die API genutzt werden soll hat das Lizenzmodell sklera Standard oder sklera Professional
+Ein sklera Benutzer der für den Zugriff auf den Channel berechtigt ist
+Die Generierung eines API Tokens für den Benutzer
+
+Die Möglichkeit den API Token einzusehen oder bei Bedarf zu erzeugen findet sich im sklera CMS unter Mehr->Benutzer 
+bei der Bearbeitung eines Benutzers. Unter den Account-Daten befindet sich ein Punkt API Token, wo dieser angezeigt 
+bzw. ggf. mittels Klick auf den entsprechenden Button erzeugt werden kann.
+
+Bitte bewahren Sie diesen Token sicher auf und geben Sie ihn nicht weiter. Mithilfe dieses Token kann jeder in Besitz 
+diesen berechtigte Channels im Rahmen der von der API zur Verfügung gestellten Möglichkeiten verändern. 
+Im Zweifel können Sie jederzeit einen neuen Token generieren.
+
 ## Installation
 
 ```bash
@@ -44,6 +60,9 @@ Für den Betrieb mehrerer Sklera-Domains (z.B. SaaS plus mehrere On-Premise-Inst
 Tools mit Instanz-Unterstützung akzeptieren einen optionalen Parameter `instance` (Name aus `instances`). Ohne Angabe wird die unter `default` definierte Instanz verwendet; fehlt `default`, gilt die erste Instanz.
 
 ## Transport
+
+Requests an die sklera REST API sind allgemein HTTP requests - je nach Endpoint GET, POST, PUT oder DELETE. 
+Zusätzlich muss der API Token mit jedem Request im Header mitgeschickt werden. Die API erwartet einen JSON Body.
 
 ### stdio (Standard, für Claude Desktop / claude.ai)
 
