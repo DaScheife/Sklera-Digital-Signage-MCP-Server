@@ -36,7 +36,7 @@ Für den Betrieb mehrerer Sklera-Domains (z.B. SaaS plus mehrere On-Premise-Inst
   "default": "my",
   "instances": {
     "my":          { "baseUrl": "https://my.sklera.tv",         "apiToken": "TOKEN_A" },
-    "ONPREMISE":   { "baseUrl": "https://<myonpremisedomain>", "apiToken": "TOKEN_B" }
+    "onpremise":   { "baseUrl": "https://<myonpremisedomain>", "apiToken": "TOKEN_B" }
   }
 }
 ```
