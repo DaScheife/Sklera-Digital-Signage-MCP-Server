@@ -9,7 +9,7 @@ Versionshistorie siehe `CHANGELOG.md`.
 ## Voraussetzungen
 
 - Node.js >= 18
-- Sklera API-Token (Manager-Rolle oder höher)
+- Sklera API-Token (Funktionen abhängig von der Benutzer-Rolle!)
 
 ## Sklera API Overview
 
