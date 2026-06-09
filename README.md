@@ -138,7 +138,8 @@ Tools mit Instanz-Unterstützung akzeptieren einen optionalen Parameter `instanc
 
 ### Schritt 8: Claude Desktop neu starten
 
-Claude Desktop vollständig beenden: System Tray-Icon rechtsklicken, "Quit" wählen. Sicherstellen, dass keine node.exe-Prozesse verbleiben:
+Claude Desktop vollständig beenden: System Tray-Icon rechtsklicken, "Quit" wählen. 
+Sicherstellen, dass keine node.exe-Prozesse verbleiben:
 
 ```powershell
 Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
