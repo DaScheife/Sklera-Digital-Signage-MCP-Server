@@ -129,7 +129,7 @@ Claude Desktop vollständig beenden: System Tray-Icon rechtsklicken, "Quit" wäh
 Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
-Claude Desktop neu starten. Nach dem Start unter "Tools" (Hammer-Icon im Chat) prüfen, ob Sklera-Tools gelistet sind.
+Claude Desktop neu starten. Der MCP Status kann in den Einstellungen -> Entwickler überprüft werden. 
 
 ### Schritt 9: Funktionstest
 
