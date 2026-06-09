@@ -45,8 +45,8 @@ Verifizieren:
 
 ```powershell
 npm --version
-Erwartete Ausgabe: Node.js v20.x.x oder höher, npm v10.x.x oder höher.
 ```
+Erwartete Ausgabe: Node.js v20.x.x oder höher, npm v10.x.x oder höher.
 
 ### Schritt 2: Git installieren
 
@@ -61,7 +61,8 @@ git --version
 ### Schritt 3: Repository klonen
 
 ```powersehell
-cd C:\Users\Alpha\Documents\Claude\mcp
+cd C:\Claude\mcp
+# Pfad wo der MCP installiert werden soll. 
 git clone https://github.com/DaScheife/Sklera-Digital-Signage-MCP-Server.git sklera-mcp-server
 cd sklera-mcp-server
 ```
