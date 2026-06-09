@@ -33,10 +33,107 @@ Im Zweifel können Sie jederzeit einen neuen Token generieren.
 
 ## Installation
 
+Voraussetzungen
+Admin-Rechte sind vorhanden. Alle Downloads erfolgen über die offiziellen Quellen.
+
+### Schritt 1: Node.js installieren
+
+```bash
+https://nodejs.org aufrufen, LTS-Version herunterladen
+Installer ausführen, alle Standardoptionen belassen (inkl. "Add to PATH")
+```
+
+Verifizieren:
+
+```bash
+npm --version
+Erwartete Ausgabe: Node.js v20.x.x oder höher, npm v10.x.x oder höher.
+```
+
+### Schritt 2: Git installieren
+
+https://git-scm.com/download/win aufrufen, Installer herunterladen
+Installer ausführen, Standardoptionen belassen
+Verifizieren:
+
+```bash
+git --version
+```
+
+### Schritt 3: Repository klonen
+
+```bash
+powershellcd C:\Users\Alpha\Documents\Claude\mcp
+git clone https://github.com/DaScheife/Sklera-Digital-Signage-MCP-Server.git sklera-mcp-server
+cd sklera-mcp-server
+```
+
+### Schritt 4: Abhängigkeiten installieren und Build ausführen
+
 ```bash
 npm install
 npm run build
 ```
+
+Nach dem Build muss das Verzeichnis dist\ vorhanden sein. 
+Prüfen:
+
+```bash
+Test-Path dist\index.js
+```
+Ausgabe muss True sein.
+
+### Schritt 5: Claude Desktop installieren
+
+Falls noch nicht vorhanden: https://claude.ai/download aufrufen, Windows-Installer herunterladen und ausführen.
+
+### Schritt 6: Claude Desktop Konfiguration anlegen
+
+Konfigurationsdatei öffnen (wird von Claude Desktop automatisch erstellt, wenn Claude mindestens einmal gestartet wurde):
+
+```bash
+notepad "$env:APPDATA\Claude\claude_desktop_config.json"
+```
+Inhalt eintragen (API-Token entsprechend ersetzen):
+
+```json
+{
+  "mcpServers": {
+    "sklera": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\Alpha\\Documents\\Claude\\mcp\\sklera-mcp-server\\dist\\index.js"
+      ],
+      "env": {
+        "SKLERA_INSTANCES": "[{\"name\":\"default\",\"baseUrl\":\"https://my.sklera.tv/data/api\",\"apiToken\":\"DEIN_API_TOKEN_HIER\"}]"
+      }
+    }
+  }
+}
+```
+Für On-Premise-Instanz zusätzlich oder alternativ:
+
+```json
+"SKLERA_INSTANCES": "[{\"name\":\"onpremise\",\"baseUrl\":\"https://ONPREMISEURL/data/api\",\"apiToken\":\"DEIN_API_TOKEN_HIER\"}]"
+```
+
+Wichtig: Der API-Token wird ausschließlich hier gespeichert, niemals im Repository.
+
+### Schritt 7: Claude Desktop neu starten
+
+Claude Desktop vollständig beenden: System Tray-Icon rechtsklicken, "Quit" wählen. Sicherstellen, dass keine node.exe-Prozesse verbleiben:
+
+```powershell
+Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+Claude Desktop neu starten. Nach dem Start unter "Tools" (Hammer-Icon im Chat) prüfen, ob Sklera-Tools gelistet sind.
+
+### Schritt 8: Funktionstest
+
+Im Claude-Chat eingeben:
+Liste alle verfügbaren Sklera-Screens auf.
+Wenn der MCP-Server korrekt verbunden ist, werden die konfigurierten Screens zurückgegeben.
 
 ## Konfiguration
 
