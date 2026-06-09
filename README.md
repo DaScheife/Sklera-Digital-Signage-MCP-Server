@@ -95,57 +95,18 @@ Konfigurationsdatei öffnen (wird von Claude Desktop automatisch erstellt, wenn 
 ```powershell
 notepad "$env:APPDATA\Claude\claude_desktop_config.json"
 ```
-Inhalt eintragen (API-Token entsprechend ersetzen):
-
-```json
-{
-  "mcpServers": {
-    "sklera": {
-      "command": "node",
-      "args": [
-        "C:\\Users\\Alpha\\Documents\\Claude\\mcp\\sklera-mcp-server\\dist\\index.js"
-      ],
-      "env": {
-        "SKLERA_INSTANCES": "[{\"name\":\"default\",\"baseUrl\":\"https://my.sklera.tv/data/api\",\"apiToken\":\"DEIN_API_TOKEN_HIER\"}]"
-      }
-    }
-  }
-}
-```
-Für On-Premise-Instanz zusätzlich oder alternativ:
-
-```json
-"SKLERA_INSTANCES": "[{\"name\":\"onpremise\",\"baseUrl\":\"https://ONPREMISEURL/data/api\",\"apiToken\":\"DEIN_API_TOKEN_HIER\"}]"
-```
-
 Wichtig: Der API-Token wird ausschließlich hier gespeichert, niemals im Repository.
 
-### Schritt 7: Claude Desktop neu starten
+### Schritt 7: Konfiguration
 
-Claude Desktop vollständig beenden: System Tray-Icon rechtsklicken, "Quit" wählen. Sicherstellen, dass keine node.exe-Prozesse verbleiben:
-
-```powershell
-Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
-```
-
-Claude Desktop neu starten. Nach dem Start unter "Tools" (Hammer-Icon im Chat) prüfen, ob Sklera-Tools gelistet sind.
-
-### Schritt 8: Funktionstest
-
-Im Claude-Chat eingeben:
-Liste alle verfügbaren Sklera-Screens auf.
-Wenn der MCP-Server korrekt verbunden ist, werden die konfigurierten Screens zurückgegeben.
-
-## Konfiguration
-
-### Einzelne Instanz (Standard)
+#### Einzelne Instanz (Standard)
 
 | Variable            | Pflicht | Default                  | Beschreibung              |
 |---------------------|---------|--------------------------|---------------------------|
 | `SKLERA_API_TOKEN`  | Ja      | –                        | API-Token aus dem Backend |
 | `SKLERA_BASE_URL`   | Nein    | `https://my.sklera.tv`   | Für On-Premise-Instanzen  |
 
-### Mehrere Instanzen (mehrere Sklera-Domains)
+#### Mehrere Instanzen (mehrere Sklera-Domains)
 
 Für den Betrieb mehrerer Sklera-Domains (z.B. SaaS plus mehrere On-Premise-Installationen, je mit eigenem Token) steht die Variable `SKLERA_INSTANCES` als JSON zur Verfügung. Ist sie gesetzt, hat sie Vorrang vor `SKLERA_API_TOKEN` / `SKLERA_BASE_URL`.
 
@@ -158,8 +119,23 @@ Für den Betrieb mehrerer Sklera-Domains (z.B. SaaS plus mehrere On-Premise-Inst
   }
 }
 ```
-
 Tools mit Instanz-Unterstützung akzeptieren einen optionalen Parameter `instance` (Name aus `instances`). Ohne Angabe wird die unter `default` definierte Instanz verwendet; fehlt `default`, gilt die erste Instanz.
+
+### Schritt 8: Claude Desktop neu starten
+
+Claude Desktop vollständig beenden: System Tray-Icon rechtsklicken, "Quit" wählen. Sicherstellen, dass keine node.exe-Prozesse verbleiben:
+
+```powershell
+Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+Claude Desktop neu starten. Nach dem Start unter "Tools" (Hammer-Icon im Chat) prüfen, ob Sklera-Tools gelistet sind.
+
+### Schritt 9: Funktionstest
+
+Im Claude-Chat eingeben:
+Liste alle verfügbaren Sklera-Screens auf.
+Wenn der MCP-Server korrekt verbunden ist, werden die konfigurierten Screens zurückgegeben.
 
 ## Transport
 
