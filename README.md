@@ -34,7 +34,8 @@ Im Zweifel können Sie jederzeit einen neuen Token generieren.
 ## Installation
 
 Voraussetzungen
-Admin-Rechte sind vorhanden. Alle Downloads erfolgen über die offiziellen Quellen.
+Admin-Rechte sind vorhanden. Alle Downloads erfolgen über die offiziellen Quellen
+bzw. über die Windows PowerShell
 
 ### Schritt 1: Node.js installieren
 
