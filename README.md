@@ -33,9 +33,8 @@ Im Zweifel können Sie jederzeit einen neuen Token generieren.
 
 ## Installation
 
-Voraussetzungen
-Admin-Rechte sind vorhanden. Alle Downloads erfolgen über die offiziellen Quellen
-bzw. über die Windows PowerShell
+Voraussetzung ist, dass Admin-Rechte vorhandens sind. Alle Downloads erfolgen über die offiziellen Quellen
+und die Konfiguration über die Windows PowerShell mit Administrator Rechten.
 
 ### Schritt 1: Node.js installieren
 
@@ -75,25 +74,42 @@ npm run build
 ```
 
 Nach dem Build muss das Verzeichnis dist\ vorhanden sein. 
-Prüfen:
+Prüfen ob die Ausgabe `true` ist. 
 
 ```powershell
 Test-Path dist\index.js
 ```
-Ausgabe muss True sein.
 
 ### Schritt 5: Claude Desktop installieren
 
 Falls noch nicht vorhanden: https://claude.ai/download aufrufen, Windows-Installer herunterladen und ausführen.
 
-### Schritt 6: Claude Desktop Konfiguration anlegen
+### Schritt 6: Claude Desktop Konfiguration anlegen. 
 
-Konfigurationsdatei öffnen (wird von Claude Desktop automatisch erstellt, wenn Claude mindestens einmal gestartet wurde):
+Konfigurationsdatei öffnen (wird von Claude Desktop automatisch erstellt, wenn Claude mindestens einmal gestartet wurde). Falls vorhanden öffnen sie die Datei mit einem Texteditor z.b. Notepad++ und ergänzen die u.s. MCP Konfiguration. 
 
 ```powershell
 notepad "$env:APPDATA\Claude\claude_desktop_config.json"
 ```
 Wichtig: Der API-Token wird ausschließlich hier gespeichert, niemals im Repository.
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) bzw.  
+`%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "sklera": {
+      "command": "node",
+      "args": ["/pfad/zu/sklera-mcp-server/dist/index.js"],
+      "env": {
+        "SKLERA_API_TOKEN": "<dein-token>",
+        "SKLERA_BASE_URL": "https://my.sklera.tv"
+      }
+    }
+  }
+}
+```
 
 ### Schritt 7: Konfiguration
 
@@ -119,6 +135,7 @@ Für den Betrieb mehrerer Sklera-Domains (z.B. SaaS plus mehrere On-Premise-Inst
 ```
 Tools mit Instanz-Unterstützung akzeptieren einen optionalen Parameter `instance` (Name aus `instances`). Ohne Angabe wird die unter `default` definierte Instanz verwendet; fehlt `default`, gilt die erste Instanz.
 
+
 ### Schritt 8: Claude Desktop neu starten
 
 Claude Desktop vollständig beenden: System Tray-Icon rechtsklicken, "Quit" wählen. Sicherstellen, dass keine node.exe-Prozesse verbleiben:
@@ -134,6 +151,8 @@ Claude Desktop neu starten. Der MCP Status kann in den Einstellungen -> Entwickl
 Im Claude-Chat eingeben:
 Liste alle verfügbaren Sklera-Screens auf.
 Wenn der MCP-Server korrekt verbunden ist, werden die konfigurierten Screens zurückgegeben.
+
+---
 
 ## Transport
 
@@ -151,29 +170,8 @@ SKLERA_API_TOKEN=<token> node dist/index.js
 ```bash
 TRANSPORT=http PORT=3000 SKLERA_API_TOKEN=<token> node dist/index.js
 ```
-
 Endpoint: `POST http://localhost:3000/mcp`  
 Health-Check: `GET http://localhost:3000/health`
-
-## Einbindung in Claude Desktop
-
-`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) bzw.  
-`%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "sklera": {
-      "command": "node",
-      "args": ["/pfad/zu/sklera-mcp-server/dist/index.js"],
-      "env": {
-        "SKLERA_API_TOKEN": "<dein-token>",
-        "SKLERA_BASE_URL": "https://my.sklera.tv"
-      }
-    }
-  }
-}
-```
 
 ## Verfügbare Tools (27)
 
