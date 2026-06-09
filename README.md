@@ -46,7 +46,7 @@ Installer ausführen, alle Standardoptionen belassen (inkl. "Add to PATH")
 
 Verifizieren:
 
-```bash
+```powershell
 npm --version
 Erwartete Ausgabe: Node.js v20.x.x oder höher, npm v10.x.x oder höher.
 ```
@@ -57,21 +57,21 @@ https://git-scm.com/download/win aufrufen, Installer herunterladen
 Installer ausführen, Standardoptionen belassen
 Verifizieren:
 
-```bash
+```powershell
 git --version
 ```
 
 ### Schritt 3: Repository klonen
 
-```bash
-powershellcd C:\Users\Alpha\Documents\Claude\mcp
+```powersehell
+cd C:\Users\Alpha\Documents\Claude\mcp
 git clone https://github.com/DaScheife/Sklera-Digital-Signage-MCP-Server.git sklera-mcp-server
 cd sklera-mcp-server
 ```
 
 ### Schritt 4: Abhängigkeiten installieren und Build ausführen
 
-```bash
+```powershell
 npm install
 npm run build
 ```
@@ -79,7 +79,7 @@ npm run build
 Nach dem Build muss das Verzeichnis dist\ vorhanden sein. 
 Prüfen:
 
-```bash
+```powershell
 Test-Path dist\index.js
 ```
 Ausgabe muss True sein.
@@ -92,7 +92,7 @@ Falls noch nicht vorhanden: https://claude.ai/download aufrufen, Windows-Install
 
 Konfigurationsdatei öffnen (wird von Claude Desktop automatisch erstellt, wenn Claude mindestens einmal gestartet wurde):
 
-```bash
+```powershell
 notepad "$env:APPDATA\Claude\claude_desktop_config.json"
 ```
 Inhalt eintragen (API-Token entsprechend ersetzen):
