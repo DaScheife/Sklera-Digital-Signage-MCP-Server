@@ -39,10 +39,8 @@ bzw. über die Windows PowerShell
 
 ### Schritt 1: Node.js installieren
 
-```bash
 https://nodejs.org aufrufen, LTS-Version herunterladen
 Installer ausführen, alle Standardoptionen belassen (inkl. "Add to PATH")
-```
 
 Verifizieren:
 
