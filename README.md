@@ -1,6 +1,6 @@
 # sklera-mcp-server
 
-Version 0.2.0
+Version 0.2.2
 
 MCP Server für die Sklera Digital Signage Data API v1.
 
