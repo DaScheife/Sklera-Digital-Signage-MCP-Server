@@ -141,6 +141,53 @@ Identify the screen either by id (screenId) or by name+channelId combination.`,
   );
 
   server.registerTool(
+    "sklera_lg_upgrade_firmware",
+    {
+      title: "LG WebOS Firmware Update",
+      description: `Triggers a remote firmware update on an LG WebOS screen/player.
+
+Sends the 'device_lg_upgradeFirmware' command with the provided EPK firmware URL
+to the specified screen. The player downloads the firmware file independently and
+installs it automatically; it will reboot once the installation is complete.
+
+Requirements:
+- The API token must belong to a user with the 'Reseller' role.
+- The firmware EPK file must be reachable by the player (HTTP preferred; older
+  WebOS firmware versions may have problems with LetsEncrypt HTTPS certificates).
+- Typical firmware size: ~1.1 GB. There is no remote progress indicator.
+
+Available LG firmware files: https://sklera.tv/firmware/lg
+
+Identify the screen either by screenId or by screenName + channelId.`,
+      inputSchema: {
+        screenId: z.string().optional().describe("Screen ID (preferred)"),
+        screenName: z.string().optional().describe("Screen name (requires channelId)"),
+        channelId: z.string().optional().describe("Required when using screenName"),
+        firmwareUrl: z.string().url().describe("Full URL to the LG EPK firmware file"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    },
+    async ({ screenId, screenName, channelId, firmwareUrl }) => {
+      try {
+        if (!screenId && !screenName) {
+          return { content: [{ type: "text", text: "Error: either screenId or screenName must be provided" }], isError: true };
+        }
+        const body: Record<string, unknown> = {
+          cmd: "device_lg_upgradeFirmware",
+          params: { firmwareUrl },
+        };
+        if (screenId) body.id = screenId;
+        if (screenName) body.name = screenName;
+        if (channelId) body.channelId = channelId;
+        const data = await client.post("/screens/sendCmd", body);
+        return { content: [{ type: "text", text: successText(data) }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
     "sklera_edit_screen",
     {
       title: "Edit Screen",

@@ -10,7 +10,7 @@ import { registerReportingTools } from "./tools/reporting.js";
 import { registerUserTools } from "./tools/users.js";
 import { registerRoomManagerTools } from "./tools/rooms.js";
 
-const SERVER_VERSION = "0.2.0";
+const SERVER_VERSION = "0.2.1";
 
 function initRegistry(): ClientRegistry {
   try {

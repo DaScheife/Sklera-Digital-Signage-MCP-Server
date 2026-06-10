@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokument
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.2.1] - 2026-06-10
+
+### Hinzugefügt
+- Neues Tool `sklera_lg_upgrade_firmware`: Löst ein Remote-Firmware-Update auf
+  einem LG WebOS Screen aus. Parameter: `screenId` (oder `screenName` +
+  `channelId`) sowie `firmwareUrl` (vollständige URL zur EPK-Datei).
+  Sendet den Befehl `device_lg_upgradeFirmware` mit dem Parameter `firmwareUrl`
+  an den Endpunkt `/screens/sendCmd`. Erfordert einen API-Token mit der Rolle
+  **Reseller**. Die Firmware-Datei wird vom Player selbstständig heruntergeladen
+  und nach der Installation automatisch neu gestartet.
+
+### Kompatibilität
+- Vollständig abwärtskompatibel. Alle bestehenden Tools bleiben unverändert.
+
 ## [0.2.0] - 2026-06-08
 
 ### Hinzugefügt
