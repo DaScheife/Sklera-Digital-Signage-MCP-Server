@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokument
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.2.2] - 2026-06-10
+
+### Behoben
+- `sklera_lg_upgrade_firmware`: Der Parameter `firmwareUrl` wird jetzt flach im
+  Request-Body gesendet statt verschachtelt unter `params`. Die verschachtelte
+  Variante wurde von der Sklera API mit HTTP 401 abgelehnt; das flache Format
+  wurde gegen die Live-API verifiziert (HTTP 200). Hinweis: Der ausführende
+  API-User benötigt die Rolle **Reseller**.
+
 ## [0.2.1] - 2026-06-10
 
 ### Hinzugefügt

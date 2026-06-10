@@ -174,7 +174,7 @@ Identify the screen either by screenId or by screenName + channelId.`,
         }
         const body: Record<string, unknown> = {
           cmd: "device_lg_upgradeFirmware",
-          params: { firmwareUrl },
+          firmwareUrl,
         };
         if (screenId) body.id = screenId;
         if (screenName) body.name = screenName;

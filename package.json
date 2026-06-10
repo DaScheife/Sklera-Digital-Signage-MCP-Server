@@ -1,6 +1,6 @@
 {
   "name": "sklera-mcp-server",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "MCP Server for Sklera Digital Signage API",
   "main": "dist/index.js",
   "scripts": {
