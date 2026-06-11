@@ -1,6 +1,6 @@
 # sklera-mcp-server
 
-Version 0.2.2
+Version 0.3.0
 
 MCP Server für die Sklera Digital Signage Data API v1.
 
@@ -53,6 +53,26 @@ SKLERA_API_TOKEN=<token> node dist/index.js
 
 ### HTTP (für Remote-Zugriff)
 
+Der HTTP-Modus (Streamable HTTP Transport) unterstützt zwei Betriebsarten:
+
+**Multi-User (empfohlen für zentrales Hosting):** Server ohne Credentials starten; jeder Request bringt seine eigenen Credentials via Header mit.
+
+```bash
+TRANSPORT=http PORT=3000 node dist/index.js
+```
+
+Unterstützte Auth-Header pro Request:
+
+| Header | Pflicht | Beschreibung |
+|---|---|---|
+| `X-Sklera-Token` | Ja* | API-Token des Users |
+| `X-Sklera-Url` | Nein | Basis-URL der Sklera-Instanz, Default `https://my.sklera.tv` |
+| `X-Sklera-Instances` | Nein | Multi-Instanz-JSON (Format wie `SKLERA_INSTANCES`); hat Vorrang vor `X-Sklera-Token` |
+
+*Entweder `X-Sklera-Token` oder `X-Sklera-Instances` muss gesetzt sein, sofern keine Server-Credentials existieren. Requests ohne Credentials werden mit HTTP 401 abgelehnt.
+
+**Single-Tenant (Fallback):** Server mit Credentials in der Umgebung starten; Requests ohne Auth-Header nutzen diese.
+
 ```bash
 TRANSPORT=http PORT=3000 SKLERA_API_TOKEN=<token> node dist/index.js
 ```
@@ -60,10 +80,19 @@ TRANSPORT=http PORT=3000 SKLERA_API_TOKEN=<token> node dist/index.js
 Endpoint: `POST http://localhost:3000/mcp`  
 Health-Check: `GET http://localhost:3000/health`
 
+Weitere Umgebungsvariablen: `HOST` (Bind-Interface, Default `0.0.0.0`).
+
+**Sicherheitshinweise für den Remote-Betrieb:**
+- Ausschließlich hinter TLS betreiben (Reverse Proxy oder Cloudflare Tunnel); Tokens werden im Klartext-Header übertragen
+- Tokens werden weder serverseitig gespeichert noch geloggt; pro Request wird eine isolierte Client-Instanz erzeugt
+- Rate-Limiting auf Proxy-Ebene (z.B. Cloudflare) wird empfohlen
+
 ## Einbindung in Claude Desktop
 
 `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) bzw.  
 `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+### Variante A: Lokal (stdio)
 
 ```json
 {
@@ -74,6 +103,41 @@ Health-Check: `GET http://localhost:3000/health`
       "env": {
         "SKLERA_API_TOKEN": "<dein-token>",
         "SKLERA_BASE_URL": "https://my.sklera.tv"
+      }
+    }
+  }
+}
+```
+
+### Variante B: Remote (HTTP)
+
+Der Token bleibt in der lokalen Konfiguration des Users; nur die Server-URL zeigt auf den gehosteten MCP Server.
+
+```json
+{
+  "mcpServers": {
+    "sklera": {
+      "type": "http",
+      "url": "https://mcp.example.net/mcp",
+      "headers": {
+        "X-Sklera-Token": "<dein-token>",
+        "X-Sklera-Url": "https://my.sklera.tv"
+      }
+    }
+  }
+}
+```
+
+Für mehrere Sklera-Instanzen pro User alternativ:
+
+```json
+{
+  "mcpServers": {
+    "sklera": {
+      "type": "http",
+      "url": "https://mcp.example.net/mcp",
+      "headers": {
+        "X-Sklera-Instances": "{\"default\":\"my\",\"instances\":{\"my\":{\"baseUrl\":\"https://my.sklera.tv\",\"apiToken\":\"TOKEN_A\"},\"onprem\":{\"baseUrl\":\"https://sklera.example.net\",\"apiToken\":\"TOKEN_B\"}}}"
       }
     }
   }

@@ -111,3 +111,53 @@ export function loadRegistryFromEnv(): ClientRegistry {
   }
   return new ClientRegistry({ default: { baseUrl, apiToken } }, "default");
 }
+
+/**
+ * Builds a per-request ClientRegistry from HTTP headers (remote mode).
+ *
+ * Precedence:
+ *  1. `x-sklera-instances`: full multi-instance JSON, identical in shape to
+ *     the SKLERA_INSTANCES environment variable. Allows one remote user to
+ *     address several Sklera domains via the `instance` tool parameter.
+ *  2. `x-sklera-token` (+ optional `x-sklera-url`, default
+ *     https://my.sklera.tv) as a single instance named "default".
+ *
+ * Returns null when no credential headers are present, so the caller can
+ * decide whether to fall back to an env-based registry or reject the request.
+ * Header values are never logged.
+ */
+export function loadRegistryFromHeaders(
+  headers: Record<string, string | string[] | undefined>
+): ClientRegistry | null {
+  const single = (name: string): string | undefined => {
+    const v = headers[name];
+    return Array.isArray(v) ? v[0] : v;
+  };
+
+  const instancesRaw = single("x-sklera-instances");
+  if (instancesRaw) {
+    let parsed: { default?: string; instances?: Record<string, InstanceConfig> };
+    try {
+      parsed = JSON.parse(instancesRaw) as typeof parsed;
+    } catch (err) {
+      throw new Error(`x-sklera-instances header is not valid JSON: ${String(err)}`);
+    }
+    const instances = parsed.instances ?? {};
+    const names = Object.keys(instances);
+    if (names.length === 0) {
+      throw new Error("x-sklera-instances header contains no instances");
+    }
+    for (const [name, cfg] of Object.entries(instances)) {
+      if (!cfg || !cfg.baseUrl || !cfg.apiToken) {
+        throw new Error(`Instance "${name}" must define both baseUrl and apiToken`);
+      }
+    }
+    return new ClientRegistry(instances, parsed.default ?? names[0]);
+  }
+
+  const apiToken = single("x-sklera-token");
+  if (!apiToken) return null;
+
+  const baseUrl = single("x-sklera-url") ?? "https://my.sklera.tv";
+  return new ClientRegistry({ default: { baseUrl, apiToken } }, "default");
+}

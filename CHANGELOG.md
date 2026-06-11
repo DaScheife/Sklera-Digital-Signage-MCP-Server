@@ -5,6 +5,42 @@ Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokument
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.3.0] - 2026-06-11
+
+### Hinzugefügt
+- **Remote-Modus mit per-Request-Authentifizierung:** Im HTTP-Transport
+  (`TRANSPORT=http`) können Credentials jetzt pro Request via Header übergeben
+  werden. Damit kann ein zentral gehosteter Server (z.B. hinter Cloudflare
+  Tunnel) von mehreren Claude-Usern mit jeweils eigenem API-Token genutzt
+  werden. Unterstützte Header:
+  - `X-Sklera-Token`: API-Token des Users (Pflicht, wenn keine
+    Server-Credentials gesetzt sind)
+  - `X-Sklera-Url`: Basis-URL der Sklera-Instanz (optional, Default
+    `https://my.sklera.tv`)
+  - `X-Sklera-Instances`: vollständiges Multi-Instanz-JSON (identisches Format
+    wie die Umgebungsvariable `SKLERA_INSTANCES`); hat Vorrang vor
+    `X-Sklera-Token`
+- Neue Funktion `loadRegistryFromHeaders()` in `src/services/registry.ts`
+- `HOST`-Umgebungsvariable für das Bind-Interface im HTTP-Modus (Default
+  `0.0.0.0`)
+- Pro HTTP-Request wird eine isolierte Server- und Client-Instanz erzeugt;
+  keine serverseitige Token-Speicherung, keine Vermischung zwischen Usern
+
+### Geändert
+- `buildServer()` akzeptiert die `ClientRegistry` als Parameter statt eines
+  modulglobalen Zustands; Voraussetzung für per-Request-Registries
+- HTTP-Modus startet auch ohne Umgebungs-Credentials (Multi-User-Betrieb);
+  sind Umgebungs-Credentials gesetzt, dienen sie als Single-Tenant-Fallback
+  für Requests ohne Auth-Header
+- Requests ohne verwertbare Credentials erhalten HTTP 401, fehlerhafte
+  Header (z.B. ungültiges JSON in `X-Sklera-Instances`) HTTP 400
+
+### Kompatibilität
+- **stdio-Modus (Claude Desktop, lokal): vollständig unverändert.** Bestehende
+  `claude_desktop_config.json`-Konfigurationen funktionieren ohne Anpassung.
+- HTTP-Modus mit Umgebungs-Credentials (v0.2.2-Verhalten) bleibt als Fallback
+  erhalten.
+
 ## [0.2.2] - 2026-06-10
 
 ### Behoben
