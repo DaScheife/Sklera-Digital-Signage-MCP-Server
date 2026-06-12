@@ -2,4 +2,5 @@ node_modules/
 dist/
 *.env
 .env.local
-*.logoauth-store.json
+*.log
+oauth-store.json
