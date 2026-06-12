@@ -1,6 +1,6 @@
 # sklera-mcp-server
 
-Version 0.3.0
+Version 0.4.0
 
 MCP Server für die Sklera Digital Signage Data API v1.
 
@@ -143,6 +143,53 @@ Für mehrere Sklera-Instanzen pro User alternativ:
   }
 }
 ```
+
+## Remote-Einbindung über OAuth (GUI-Konnektor)
+
+Claudes grafische Konnektor-Verwaltung ("Benutzerdefinierter Konnektor") akzeptiert
+nur eine URL und spricht zur Authentifizierung ausschließlich die MCP-Authorization-
+Spezifikation (OAuth 2.1 + PKCE, Dynamic Client Registration). Statische Header wie in
+Variante B lassen sich dort nicht hinterlegen. Schlägt die automatische Registrierung
+fehl ("Registrierung beim Anmeldedienst fehlgeschlagen"), liegt es daran, dass der
+Server kein OAuth anbietet. Ab Version 0.4.0 bringt der HTTP-Transport einen eigenen,
+schlanken OAuth-2.1-Server mit.
+
+### Aktivierung
+
+```bash
+TRANSPORT=http PORT=3000 PUBLIC_URL=https://mcp.example.net node dist/index.js
+```
+
+| Variable           | Pflicht | Beschreibung |
+|--------------------|---------|--------------|
+| `PUBLIC_URL`       | Ja (für OAuth) | Extern erreichbare https-Origin des Servers; wird zum OAuth-Issuer und zur Resource-Kennung. Muss exakt der URL entsprechen, unter der Claude den Server erreicht. |
+| `OAUTH_STORE_FILE` | Nein    | Pfad zu einer JSON-Datei zur Persistenz von Clients und Tokens über Neustarts hinweg. Ohne Angabe rein im Arbeitsspeicher. Hinweis: das Sklera-Token wird dann unverschlüsselt gespeichert, Datei mit Dateirechten 600 schützen. |
+
+`PUBLIC_URL` muss auf die öffentliche https-Adresse zeigen (Reverse Proxy bzw.
+Cloudflare Tunnel), nicht auf `localhost`. Ohne TLS funktioniert der Flow in Claude nicht.
+
+### Ablauf
+
+1. Konnektor in Claude mit der `/mcp`-URL anlegen (z.B. `https://mcp.example.net/mcp`).
+2. Claude entdeckt über `/.well-known/oauth-protected-resource` den Authorization-Server,
+   registriert sich per Dynamic Client Registration und startet den Authorize-Flow.
+3. Es öffnet sich eine Login-Seite des MCP-Servers. Dort das Sklera API-Token und bei
+   On-Premise die Instanz-URL eintragen.
+4. Das Token wird gegen `/data/api/channels/list` geprüft und an den ausgestellten
+   Bearer-Token gebunden. Ab dann sendet Claude den Bearer-Token automatisch mit.
+
+Die bisherigen Header-Varianten (`X-Sklera-Token`, `X-Sklera-Instances`) bleiben parallel
+nutzbar, etwa für die Einbindung per Konfigurationsdatei (Variante B).
+
+### Sicherheit
+
+- Ausschließlich hinter TLS betreiben; sowohl die Login-Seite als auch die Tokens
+  werden sonst im Klartext übertragen.
+- Pro Verbindung legt Claude bei Dynamic Client Registration einen neuen Client an;
+  bei vielen Neuverbindungen wächst der Client-Bestand. `OAUTH_STORE_FILE` regelmäßig
+  prüfen oder bei Bedarf zurücksetzen.
+- Wird der Server neu gestartet und ist `OAUTH_STORE_FILE` nicht gesetzt, müssen alle
+  Nutzer sich neu autorisieren.
 
 ## Verfügbare Tools (27)
 

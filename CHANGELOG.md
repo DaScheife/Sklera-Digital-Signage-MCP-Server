@@ -5,6 +5,35 @@ Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokument
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.4.0] - 2026-06-12
+
+### Hinzugefügt
+- **Eingebauter OAuth-2.1-Authorization-Server (Remote-Modus):** Der HTTP-Transport
+  kann jetzt über Claudes GUI-Connector ("Benutzerdefinierter Konnektor", nur URL)
+  eingebunden werden. Damit entfällt der Fehler "Registrierung beim Anmeldedienst
+  fehlgeschlagen", der auftrat, weil die GUI ausschließlich OAuth (mit Dynamic Client
+  Registration) spricht und keine statischen Header zulässt.
+  - Neue Endpunkte über `mcpAuthRouter` des MCP SDK: `/.well-known/oauth-protected-resource`
+    (RFC 9728), `/.well-known/oauth-authorization-server` (RFC 8414), `/register`
+    (RFC 7591 Dynamic Client Registration), `/authorize`, `/token`, `/revoke`.
+  - Neuer Provider `SkleraOAuthProvider` in `src/services/oauth.ts`: zeigt während des
+    Authorize-Schritts eine Login-Seite an, auf der der User sein Sklera API-Token
+    (und optional die Instanz-URL) hinterlegt. Das Token wird per Best-Effort gegen
+    `/data/api/channels/list` validiert und an den ausgestellten Bearer-Token gebunden.
+  - PKCE (S256) wird erzwungen; Authorization Codes sind Einmal-gültig (5 Min TTL),
+    Access Tokens 1 Stunde, Refresh Tokens werden rotiert.
+  - Neue Umgebungsvariable `PUBLIC_URL` aktiviert den OAuth-Modus und definiert den
+    Issuer bzw. die Resource-Kennung (z.B. `https://mcp.example.net`).
+  - Optionale Umgebungsvariable `OAUTH_STORE_FILE` persistiert Clients und Tokens auf
+    Platte (überlebt Neustarts; Sklera-Token liegt dann im Klartext, Datei entsprechend
+    schützen). Ohne sie bleibt der Speicher rein im RAM.
+
+### Geändert
+- `SERVER_VERSION` auf `0.4.0`.
+- `/mcp` akzeptiert im OAuth-Modus weiterhin die bisherigen Credential-Header
+  (`X-Sklera-Token` / `X-Sklera-Instances`) als Fallback; beide Wege funktionieren
+  parallel. Ohne `PUBLIC_URL` verhält sich der Server unverändert wie in 0.3.0.
+
 ## [0.3.0] - 2026-06-11
 
 ### Hinzugefügt
