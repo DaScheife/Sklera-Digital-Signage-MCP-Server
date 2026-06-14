@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
 import { formatToolError, successText } from "../services/client.js";
 import { ClientRegistry } from "../services/registry.js";
+import { instanceField } from "./shared.js";
 
 export function registerUserTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
@@ -19,14 +19,7 @@ Use this to audit which users have access to which channels.
 
 Multi-instance: set "instance" to the name of a configured Sklera domain to
 query that instance; omit it to use the default instance.`,
-      inputSchema: {
-        instance: z
-          .string()
-          .optional()
-          .describe(
-            "Optional: name of the configured Sklera instance/domain to query. Omit for the default instance."
-          ),
-      },
+      inputSchema: { ...instanceField },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

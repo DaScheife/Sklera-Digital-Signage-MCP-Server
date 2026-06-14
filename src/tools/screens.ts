@@ -1,8 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { SkleraClient, formatToolError, successText } from "../services/client.js";
+import { formatToolError, successText } from "../services/client.js";
+import { ClientRegistry } from "../services/registry.js";
+import { instanceField } from "./shared.js";
 
-export function registerChannelTools(server: McpServer, client: SkleraClient): void {
+export function registerChannelTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_list_channels",
     {
@@ -11,12 +13,12 @@ export function registerChannelTools(server: McpServer, client: SkleraClient): v
 
 Returns channel IDs, names, types, storage quotas and language settings.
 Use the returned _id as channelId in other tools (items, playlists, screens, etc.).`,
-      inputSchema: {},
+      inputSchema: { ...instanceField },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async () => {
+    async ({ instance }) => {
       try {
-        const data = await client.get("/channels/list");
+        const data = await registry.resolve(instance).get("/channels/list");
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -25,7 +27,7 @@ Use the returned _id as channelId in other tools (items, playlists, screens, etc
   );
 }
 
-export function registerScreenTools(server: McpServer, client: SkleraClient): void {
+export function registerScreenTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_list_screens",
     {
@@ -35,12 +37,12 @@ export function registerScreenTools(server: McpServer, client: SkleraClient): vo
 Each screen includes: _id, name, channelId, channelName, deviceType, resolution,
 buildVersion, screenGroupId, customId, address, operatingTimes, registered, updatedAt.
 Use _id as screenId in other screen tools.`,
-      inputSchema: {},
+      inputSchema: { ...instanceField },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async () => {
+    async ({ instance }) => {
       try {
-        const data = await client.get("/screens/list");
+        const data = await registry.resolve(instance).get("/screens/list");
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -56,12 +58,12 @@ Use _id as screenId in other screen tools.`,
 
 Includes totalStats (screenCount, screenOnlineStats for current/lastDay/last7Days/last30Days)
 and per-channel breakdown. Useful for fleet health monitoring.`,
-      inputSchema: {},
+      inputSchema: { ...instanceField },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async () => {
+    async ({ instance }) => {
       try {
-        const data = await client.get("/screens/stats");
+        const data = await registry.resolve(instance).get("/screens/stats");
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -79,13 +81,14 @@ Each entry contains: screenName, screenState, connected (boolean), isStandby, la
 Optionally filter by channelId. Leave channelId empty to get status for all accessible channels.`,
       inputSchema: {
         channelId: z.string().optional().describe("Optional: filter by channel ID"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ channelId }) => {
+    async ({ channelId, instance }) => {
       try {
         const body = channelId ? { channelId } : {};
-        const data = await client.get("/screens/getConnectionStatus", body as Record<string, unknown>);
+        const data = await registry.resolve(instance).get("/screens/getConnectionStatus", body as Record<string, unknown>);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -120,10 +123,11 @@ Identify the screen either by id (screenId) or by name+channelId combination.`,
           "trigger_touch_action", "trigger_app_event",
           "app_hide", "app_show",
         ]).describe("Command to send"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ screenId, screenName, channelId, cmd }) => {
+    async ({ screenId, screenName, channelId, cmd, instance }) => {
       try {
         if (!screenId && !screenName) {
           return { content: [{ type: "text", text: "Error: either screenId or screenName must be provided" }], isError: true };
@@ -132,7 +136,7 @@ Identify the screen either by id (screenId) or by name+channelId combination.`,
         if (screenId) body.id = screenId;
         if (screenName) body.name = screenName;
         if (channelId) body.channelId = channelId;
-        const data = await client.post("/screens/sendCmd", body);
+        const data = await registry.resolve(instance).post("/screens/sendCmd", body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -164,10 +168,11 @@ Identify the screen either by screenId or by screenName + channelId.`,
         screenName: z.string().optional().describe("Screen name (requires channelId)"),
         channelId: z.string().optional().describe("Required when using screenName"),
         firmwareUrl: z.string().url().describe("Full URL to the LG EPK firmware file"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
-    async ({ screenId, screenName, channelId, firmwareUrl }) => {
+    async ({ screenId, screenName, channelId, firmwareUrl, instance }) => {
       try {
         if (!screenId && !screenName) {
           return { content: [{ type: "text", text: "Error: either screenId or screenName must be provided" }], isError: true };
@@ -179,7 +184,7 @@ Identify the screen either by screenId or by screenName + channelId.`,
         if (screenId) body.id = screenId;
         if (screenName) body.name = screenName;
         if (channelId) body.channelId = channelId;
-        const data = await client.post("/screens/sendCmd", body);
+        const data = await registry.resolve(instance).post("/screens/sendCmd", body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -201,13 +206,14 @@ Only supply fields you want to change; omitted fields remain unchanged.`,
         customId: z.string().optional(),
         description: z.string().optional(),
         screenGroupId: z.string().optional(),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ screenId, ...fields }) => {
+    async ({ screenId, instance, ...fields }) => {
       try {
         const body = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-        const data = await client.put(`/screens/edit/${screenId}`, body);
+        const data = await registry.resolve(instance).put(`/screens/edit/${screenId}`, body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -225,12 +231,13 @@ Each group includes: _id, name, channelId, isDefault, and the assigned playlists
 Screen groups are used in Playouts to target sets of screens.`,
       inputSchema: {
         channelId: z.string().describe("Channel ID to retrieve screen groups from"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ channelId }) => {
+    async ({ channelId, instance }) => {
       try {
-        const data = await client.get("/screengroups/list", { channelId });
+        const data = await registry.resolve(instance).get("/screengroups/list", { channelId });
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };

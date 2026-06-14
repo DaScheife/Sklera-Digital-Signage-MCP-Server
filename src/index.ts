@@ -22,7 +22,7 @@ import { registerReportingTools } from "./tools/reporting.js";
 import { registerUserTools } from "./tools/users.js";
 import { registerRoomManagerTools } from "./tools/rooms.js";
 
-const SERVER_VERSION = "0.5.0";
+const SERVER_VERSION = "0.6.0";
 
 /**
  * Builds a fully configured McpServer for the given registry.
@@ -37,17 +37,17 @@ function buildServer(registry: ClientRegistry): McpServer {
     version: SERVER_VERSION,
   });
 
-  const client = registry.default();
-
-  registerChannelTools(server, client);
-  registerScreenTools(server, client);
-  registerPlaylistTools(server, client);
-  registerNodeTools(server, client);
-  registerItemTools(server, client);
-  registerPlayoutTools(server, client);
-  registerMessageTools(server, client);
-  registerCustomValueTools(server, client);
-  registerReportingTools(server, client);
+  // Every tool receives the full registry and resolves its target instance from
+  // the optional `instance` parameter, falling back to the default instance.
+  registerChannelTools(server, registry);
+  registerScreenTools(server, registry);
+  registerPlaylistTools(server, registry);
+  registerNodeTools(server, registry);
+  registerItemTools(server, registry);
+  registerPlayoutTools(server, registry);
+  registerMessageTools(server, registry);
+  registerCustomValueTools(server, registry);
+  registerReportingTools(server, registry);
   registerUserTools(server, registry);
   registerRoomManagerTools(server, registry);
 

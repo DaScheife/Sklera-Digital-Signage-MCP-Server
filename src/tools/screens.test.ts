@@ -27,11 +27,16 @@ function setup() {
     post: vi.fn(),
     put: vi.fn(),
   };
+  // Tools now receive the ClientRegistry and resolve a client per call. The
+  // fake registry hands back the same fake client and records the instance.
+  const registry = {
+    resolve: vi.fn(() => client),
+  };
 
   // The casts tell TypeScript "trust me, these stand in for the real types".
-  registerScreenTools(server as never, client as never);
+  registerScreenTools(server as never, registry as never);
 
-  return { handlers, client };
+  return { handlers, client, registry };
 }
 
 describe("sklera_list_screens", () => {
@@ -96,5 +101,52 @@ describe("sklera_send_screen_command", () => {
       cmd: "device_restart",
       id: "s1",
     });
+  });
+
+  it("does not forward the instance selector into the command body", async () => {
+    // Arrange
+    const { handlers, client, registry } = setup();
+    client.post.mockResolvedValue({ success: true });
+
+    // Act
+    await handlers.get("sklera_send_screen_command")!({
+      screenId: "s1",
+      cmd: "device_restart",
+      instance: "radiomax",
+    });
+
+    // Assert: instance routes the client but never reaches the API body.
+    expect(registry.resolve).toHaveBeenCalledWith("radiomax");
+    expect(client.post).toHaveBeenCalledWith("/screens/sendCmd", {
+      cmd: "device_restart",
+      id: "s1",
+    });
+  });
+});
+
+describe("instance routing", () => {
+  it("resolves the named instance for list_screens", async () => {
+    // Arrange
+    const { handlers, client, registry } = setup();
+    client.get.mockResolvedValue([]);
+
+    // Act
+    await handlers.get("sklera_list_screens")!({ instance: "radiomax" });
+
+    // Assert
+    expect(registry.resolve).toHaveBeenCalledWith("radiomax");
+    expect(client.get).toHaveBeenCalledWith("/screens/list");
+  });
+
+  it("resolves the default instance when none is given", async () => {
+    // Arrange
+    const { handlers, client, registry } = setup();
+    client.get.mockResolvedValue([]);
+
+    // Act
+    await handlers.get("sklera_list_screens")!({});
+
+    // Assert: resolve(undefined) → default instance.
+    expect(registry.resolve).toHaveBeenCalledWith(undefined);
   });
 });

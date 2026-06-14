@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { formatToolError, successText } from "../services/client.js";
 import { ClientRegistry } from "../services/registry.js";
+import { instanceField } from "./shared.js";
 
 /**
  * Tools for the Sklera Roommanager module
@@ -11,15 +12,6 @@ import { ClientRegistry } from "../services/registry.js";
  * bodies. All calls authenticate via the apiToken query parameter, handled
  * centrally in SkleraClient.roomRequest().
  */
-
-const instanceField = {
-  instance: z
-    .string()
-    .optional()
-    .describe(
-      "Optional: name of the configured Sklera instance/domain to query. Omit for the default instance."
-    ),
-};
 
 // Shared room property shape (Roommanager roomData).
 const roomCreateShape = {

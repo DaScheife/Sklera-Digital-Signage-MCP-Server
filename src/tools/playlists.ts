@@ -1,8 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { SkleraClient, formatToolError, successText } from "../services/client.js";
+import { formatToolError, successText } from "../services/client.js";
+import { ClientRegistry } from "../services/registry.js";
+import { instanceField } from "./shared.js";
 
-export function registerPlaylistTools(server: McpServer, client: SkleraClient): void {
+export function registerPlaylistTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_list_playlists",
     {
@@ -12,12 +14,12 @@ export function registerPlaylistTools(server: McpServer, client: SkleraClient): 
 Each playlist includes: _id, name, channelId, isActive, isScheduled, isRandom,
 defaultDuration, defaultTransition, spotsDisabledByDefault.
 Use _id as playlistId in node/playout tools.`,
-      inputSchema: {},
+      inputSchema: { ...instanceField },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async () => {
+    async ({ instance }) => {
       try {
-        const data = await client.get("/playlists/list");
+        const data = await registry.resolve(instance).get("/playlists/list");
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -45,12 +47,13 @@ Returns the new playlist object including its _id.`,
         isActive: z.boolean().optional(),
         isScheduled: z.boolean().optional(),
         spotsDisabledByDefault: z.boolean().optional(),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (params) => {
+    async ({ instance, ...params }) => {
       try {
-        const data = await client.post("/playlists/new", params);
+        const data = await registry.resolve(instance).post("/playlists/new", params);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -78,13 +81,14 @@ Returns the edited playlistId.`,
         isScheduled: z.boolean().optional(),
         spotsDisabledByDefault: z.boolean().optional(),
         alwaysDownload: z.boolean().optional(),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ playlistId, ...fields }) => {
+    async ({ playlistId, instance, ...fields }) => {
       try {
         const body = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-        const data = await client.put(`/playlists/edit/${playlistId}`, body);
+        const data = await registry.resolve(instance).put(`/playlists/edit/${playlistId}`, body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -101,12 +105,13 @@ Returns the edited playlistId.`,
 Returns the deletedPlaylistId on success.`,
       inputSchema: {
         playlistId: z.string().describe("ID of the playlist to delete"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
-    async ({ playlistId }) => {
+    async ({ playlistId, instance }) => {
       try {
-        const data = await client.delete(`/playlists/delete/${playlistId}`, undefined, { playlistId });
+        const data = await registry.resolve(instance).delete(`/playlists/delete/${playlistId}`, undefined, { playlistId });
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -123,12 +128,13 @@ Returns the deletedPlaylistId on success.`,
 Returns nodesDropped count.`,
       inputSchema: {
         playlistId: z.string().describe("ID of the playlist to clear"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
-    async ({ playlistId }) => {
+    async ({ playlistId, instance }) => {
       try {
-        const data = await client.post(`/playlists/clear/${playlistId}`, undefined, { playlistId });
+        const data = await registry.resolve(instance).post(`/playlists/clear/${playlistId}`, undefined, { playlistId });
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -147,12 +153,13 @@ Returns nodesDropped count.`,
       inputSchema: {
         playlistId: z.string().describe("ID of the playlist to prune"),
         pruneAll: z.boolean().optional().describe("Also remove disabled spots (default: false)"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
-    async ({ playlistId, pruneAll }) => {
+    async ({ playlistId, pruneAll, instance }) => {
       try {
-        const data = await client.post(
+        const data = await registry.resolve(instance).post(
           `/playlists/prune/${playlistId}`,
           pruneAll !== undefined ? { pruneAll } : undefined,
           { playlistId }
@@ -165,7 +172,7 @@ Returns nodesDropped count.`,
   );
 }
 
-export function registerNodeTools(server: McpServer, client: SkleraClient): void {
+export function registerNodeTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_list_nodes",
     {
@@ -177,12 +184,13 @@ validFrom, validTo, validWeekdays, validStartTime, validEndTime, transition, ren
 Use _id as nodeId in edit/delete node tools.`,
       inputSchema: {
         playlistId: z.string().describe("ID of the playlist to get spots from"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ playlistId }) => {
+    async ({ playlistId, instance }) => {
       try {
-        const data = await client.get("/nodes/list", { playlistId });
+        const data = await registry.resolve(instance).get("/nodes/list", { playlistId });
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -214,13 +222,14 @@ Returns the new nodeId.`,
         validStartTime: z.number().int().optional().describe("Minutes from midnight, e.g. 540 = 09:00"),
         validEndTime: z.number().int().optional().describe("Minutes from midnight, e.g. 1080 = 18:00"),
         disabled: z.boolean().optional(),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (params) => {
+    async ({ instance, ...params }) => {
       try {
         const body = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined));
-        const data = await client.post("/nodes/new", body);
+        const data = await registry.resolve(instance).post("/nodes/new", body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -248,13 +257,14 @@ validWeekdays, validStartTime, validEndTime, disabled.`,
         validStartTime: z.number().int().optional().describe("Minutes from midnight"),
         validEndTime: z.number().int().optional().describe("Minutes from midnight"),
         disabled: z.boolean().optional(),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ nodeId, ...fields }) => {
+    async ({ nodeId, instance, ...fields }) => {
       try {
         const body = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-        const data = await client.put(`/nodes/edit/${nodeId}`, body);
+        const data = await registry.resolve(instance).put(`/nodes/edit/${nodeId}`, body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -271,12 +281,13 @@ validWeekdays, validStartTime, validEndTime, disabled.`,
 Returns the deletedNodeId on success.`,
       inputSchema: {
         nodeId: z.string().describe("ID of the node to delete"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
-    async ({ nodeId }) => {
+    async ({ nodeId, instance }) => {
       try {
-        const data = await client.delete(`/nodes/delete/${nodeId}`, undefined, { nodeId });
+        const data = await registry.resolve(instance).delete(`/nodes/delete/${nodeId}`, undefined, { nodeId });
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };

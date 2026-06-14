@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { SkleraClient, formatToolError, successText } from "../services/client.js";
+import { formatToolError, successText } from "../services/client.js";
+import { ClientRegistry } from "../services/registry.js";
+import { instanceField } from "./shared.js";
 
 const ReportingBaseSchema = {
   channelId: z.string().describe("Channel ID to report on"),
@@ -11,13 +13,14 @@ const ReportingBaseSchema = {
   monthOffset: z.number().optional().describe("0=current month, 1=last month, etc."),
   itemIds: z.array(z.string()).optional().describe("Filter by specific item IDs"),
   screenIds: z.array(z.string()).optional().describe("Filter by specific screen IDs"),
+  ...instanceField,
 };
 
 function buildReportBody(params: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined));
 }
 
-export function registerReportingTools(server: McpServer, client: SkleraClient): void {
+export function registerReportingTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_reporting_played_live",
     {
@@ -30,9 +33,9 @@ Use dayOffset/weekOffset/monthOffset for convenient relative date ranges.`,
       inputSchema: ReportingBaseSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (params) => {
+    async ({ instance, ...params }) => {
       try {
-        const data = await client.post("/reporting/itemPlayed/live", buildReportBody(params as Record<string, unknown>));
+        const data = await registry.resolve(instance).post("/reporting/itemPlayed/live", buildReportBody(params as Record<string, unknown>));
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -51,9 +54,9 @@ Useful for identifying peak playback hours per content or screen.`,
       inputSchema: ReportingBaseSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (params) => {
+    async ({ instance, ...params }) => {
       try {
-        const data = await client.post("/reporting/itemPlayed/hourly", buildReportBody(params as Record<string, unknown>));
+        const data = await registry.resolve(instance).post("/reporting/itemPlayed/hourly", buildReportBody(params as Record<string, unknown>));
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -72,9 +75,9 @@ Useful for trend analysis and monthly performance reports.`,
       inputSchema: ReportingBaseSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (params) => {
+    async ({ instance, ...params }) => {
       try {
-        const data = await client.post("/reporting/itemPlayed/daily", buildReportBody(params as Record<string, unknown>));
+        const data = await registry.resolve(instance).post("/reporting/itemPlayed/daily", buildReportBody(params as Record<string, unknown>));
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -93,9 +96,9 @@ Useful for auditing interactive kiosk usage.`,
       inputSchema: ReportingBaseSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (params) => {
+    async ({ instance, ...params }) => {
       try {
-        const data = await client.post("/reporting/touch/live", buildReportBody(params as Record<string, unknown>));
+        const data = await registry.resolve(instance).post("/reporting/touch/live", buildReportBody(params as Record<string, unknown>));
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -114,9 +117,9 @@ Useful for measuring engagement trends on interactive screens.`,
       inputSchema: ReportingBaseSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (params) => {
+    async ({ instance, ...params }) => {
       try {
-        const data = await client.post("/reporting/touch/daily", buildReportBody(params as Record<string, unknown>));
+        const data = await registry.resolve(instance).post("/reporting/touch/daily", buildReportBody(params as Record<string, unknown>));
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };

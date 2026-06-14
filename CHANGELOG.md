@@ -5,6 +5,34 @@ Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokument
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.6.0] - 2026-06-14
+
+### Hinzugefügt
+- **`instance`-Parameter an allen Tools:** Der optionale Parameter `instance`
+  (Auswahl der Ziel-Domain aus der konfigurierten Instanzen-Abbildung) steht jetzt
+  bei **jedem** Tool zur Verfügung – zuvor nur bei `sklera_list_users` und den
+  Roommanager-Tools. Damit lassen sich Channels, Screens, Playlists, Nodes, Items,
+  Playouts, Messages, Custom Values und Reporting gezielt auf einer beliebigen
+  gebundenen Instanz abfragen. Dies vervollständigt den in 0.5.0 eingeführten
+  Mehrinstanz-OAuth-Support: gebundene Instanzen sind nun über alle Tools
+  ansprechbar (greift gleichermaßen für `SKLERA_INSTANCES`, `X-Sklera-Instances`
+  und OAuth).
+- Neue gemeinsame Definition `instanceField` in `src/tools/shared.ts`, von allen
+  Tool-Modulen genutzt (entfernt die zuvor in `users.ts`/`rooms.ts` duplizierte
+  Schema-Definition).
+
+### Geändert
+- `SERVER_VERSION` auf `0.6.0`.
+- Alle `register*Tools`-Funktionen erhalten in `buildServer()` die vollständige
+  `ClientRegistry` statt eines fest verdrahteten Default-Clients und lösen pro
+  Aufruf über `registry.resolve(instance)` die Ziel-Instanz auf.
+
+### Kompatibilität
+- Vollständig abwärtskompatibel: `instance` ist optional; ohne Angabe wird wie
+  bisher die Default-Instanz verwendet. stdio-, Header- und OAuth-Varianten bleiben
+  unverändert. Der Parameter `instance` wird in keinem Fall an die Sklera-API
+  weitergereicht (er dient nur der Client-Auswahl).
+
 ## [0.5.0] - 2026-06-14
 
 ### Hinzugefügt

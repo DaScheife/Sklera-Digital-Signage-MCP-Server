@@ -1,8 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { SkleraClient, formatToolError, successText } from "../services/client.js";
+import { formatToolError, successText } from "../services/client.js";
+import { ClientRegistry } from "../services/registry.js";
+import { instanceField } from "./shared.js";
 
-export function registerItemTools(server: McpServer, client: SkleraClient): void {
+export function registerItemTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_list_items",
     {
@@ -20,16 +22,17 @@ Each item includes: _id, name, type, extension, fileSize, uploadedAt, folder, me
         recursive: z.boolean().default(true).describe("Include subfolders (default: true)"),
         folder: z.string().optional().describe("Limit to this folder ID and its subfolders"),
         uploadDate: z.string().optional().describe("ISO 8601: return items added after this date"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ channelId, itemType, recursive, folder, uploadDate }) => {
+    async ({ channelId, itemType, recursive, folder, uploadDate, instance }) => {
       try {
         const params: Record<string, unknown> = { channelId, recursive };
         if (itemType?.length) params.itemType = itemType.join(",");
         if (folder) params.folder = folder;
         if (uploadDate) params.uploadDate = uploadDate;
-        const data = await client.get("/items/list", params);
+        const data = await registry.resolve(instance).get("/items/list", params);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -47,12 +50,13 @@ Includes: _id, name, type, mimeType, extension, size, created, tags, categories,
 thumbUrl, rawUrl, imageUrl, versions (for images).`,
       inputSchema: {
         itemId: z.string().describe("ID of the library item"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ itemId }) => {
+    async ({ itemId, instance }) => {
       try {
-        const data = await client.get(`/items/get/${itemId}`);
+        const data = await registry.resolve(instance).get(`/items/get/${itemId}`);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -75,15 +79,16 @@ Returns the updated itemId.`,
         url: z.string().url().describe("Public URL of the new content"),
         mimeType: z.string().optional().describe("Fallback MIME type, e.g. image/png"),
         extension: z.string().optional().describe("Fallback extension, e.g. .png"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
-    async ({ itemId, url, mimeType, extension }) => {
+    async ({ itemId, url, mimeType, extension, instance }) => {
       try {
         const body: Record<string, unknown> = { url };
         if (mimeType) body.mimeType = mimeType;
         if (extension) body.extension = extension;
-        const data = await client.post(`/items/replace/${itemId}`, body);
+        const data = await registry.resolve(instance).post(`/items/replace/${itemId}`, body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -101,12 +106,13 @@ Note: Items that are currently used in playlists may still be referenced after d
 Returns the deleted itemId.`,
       inputSchema: {
         itemId: z.string().describe("ID of the item to delete"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
-    async ({ itemId }) => {
+    async ({ itemId, instance }) => {
       try {
-        const data = await client.delete(`/items/delete/${itemId}`);
+        const data = await registry.resolve(instance).delete(`/items/delete/${itemId}`);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -126,15 +132,16 @@ Returns the new itemId.`,
         itemId: z.string().describe("ID of the item to copy"),
         channelId: z.string().optional().describe("Target channel (defaults to same channel)"),
         folderName: z.string().optional().describe("Target folder name"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ itemId, channelId, folderName }) => {
+    async ({ itemId, channelId, folderName, instance }) => {
       try {
         const body: Record<string, unknown> = {};
         if (channelId) body.channelId = channelId;
         if (folderName) body.folderName = folderName;
-        const data = await client.post(`/items/copy/${itemId}`, body);
+        const data = await registry.resolve(instance).post(`/items/copy/${itemId}`, body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -143,7 +150,7 @@ Returns the new itemId.`,
   );
 }
 
-export function registerPlayoutTools(server: McpServer, client: SkleraClient): void {
+export function registerPlayoutTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_list_playouts",
     {
@@ -155,14 +162,15 @@ Each playout includes: id, name, isActive, priority.
 Use the id as playoutId in get/edit/delete tools.`,
       inputSchema: {
         channelId: z.string().optional().describe("Optional: filter by channel ID"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ channelId }) => {
+    async ({ channelId, instance }) => {
       try {
         const params: Record<string, unknown> = {};
         if (channelId) params.channelId = channelId;
-        const data = await client.get("/playouts/list", params);
+        const data = await registry.resolve(instance).get("/playouts/list", params);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -180,12 +188,13 @@ Includes: name, channelId, isActive, priority, playlists, screens, screenGroups,
 screenCategories, timeslots.`,
       inputSchema: {
         playoutId: z.string().describe("ID of the playout"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ playoutId }) => {
+    async ({ playoutId, instance }) => {
       try {
-        const data = await client.get(`/playouts/get/${playoutId}`);
+        const data = await registry.resolve(instance).get(`/playouts/get/${playoutId}`);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -211,13 +220,14 @@ Returns the updated playoutId.`,
         screens: z.array(z.string()).optional().describe("Array of screen IDs"),
         screenGroups: z.array(z.string()).optional(),
         screenCategories: z.array(z.string()).optional(),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ playoutId, ...fields }) => {
+    async ({ playoutId, instance, ...fields }) => {
       try {
         const body = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-        const data = await client.put(`/playouts/edit/${playoutId}`, body);
+        const data = await registry.resolve(instance).put(`/playouts/edit/${playoutId}`, body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -232,12 +242,13 @@ Returns the updated playoutId.`,
       description: `Permanently deletes a playout by playoutId. This cannot be undone.`,
       inputSchema: {
         playoutId: z.string().describe("ID of the playout to delete"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     },
-    async ({ playoutId }) => {
+    async ({ playoutId, instance }) => {
       try {
-        const data = await client.delete(`/playouts/delete/${playoutId}`, undefined, { playoutId });
+        const data = await registry.resolve(instance).delete(`/playouts/delete/${playoutId}`, undefined, { playoutId });
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -246,7 +257,7 @@ Returns the updated playoutId.`,
   );
 }
 
-export function registerMessageTools(server: McpServer, client: SkleraClient): void {
+export function registerMessageTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_list_messages",
     {
@@ -254,12 +265,12 @@ export function registerMessageTools(server: McpServer, client: SkleraClient): v
       description: `Returns all existing ticker/overlay messages.
 
 Each message includes: channelId, screens, allScreens, text, startsAt, endsAt, enabled, duration.`,
-      inputSchema: {},
+      inputSchema: { ...instanceField },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async () => {
+    async ({ instance }) => {
       try {
-        const data = await client.get("/messages/list");
+        const data = await registry.resolve(instance).get("/messages/list");
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -289,13 +300,14 @@ Returns the new messageId.`,
         enabled: z.boolean().optional().default(true),
         hasDuration: z.boolean().optional(),
         duration: z.number().int().optional().describe("Display duration in seconds"),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (params) => {
+    async ({ instance, ...params }) => {
       try {
         const body = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined));
-        const data = await client.post("/messages/new", body);
+        const data = await registry.resolve(instance).post("/messages/new", body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -304,7 +316,7 @@ Returns the new messageId.`,
   );
 }
 
-export function registerCustomValueTools(server: McpServer, client: SkleraClient): void {
+export function registerCustomValueTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_get_custom_values",
     {
@@ -312,12 +324,12 @@ export function registerCustomValueTools(server: McpServer, client: SkleraClient
       description: `Returns all custom values (key-value pairs used in dynamic content).
 
 Each entry includes: _id, key, value, parentId, permissions (public/private), isEncrypted.`,
-      inputSchema: {},
+      inputSchema: { ...instanceField },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async () => {
+    async ({ instance }) => {
       try {
-        const data = await client.get("/customValues/get");
+        const data = await registry.resolve(instance).get("/customValues/get");
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
@@ -336,14 +348,15 @@ Returns the updated custom value object.`,
         customValueId: z.string().describe("ID of the custom value to edit"),
         value: z.string().describe("New value"),
         permissions: z.enum(["public","private"]).optional(),
+        ...instanceField,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ customValueId, value, permissions }) => {
+    async ({ customValueId, value, permissions, instance }) => {
       try {
         const body: Record<string, unknown> = { value };
         if (permissions) body.permissions = permissions;
-        const data = await client.put(`/customValues/edit/${customValueId}`, body);
+        const data = await registry.resolve(instance).put(`/customValues/edit/${customValueId}`, body);
         return { content: [{ type: "text", text: successText(data) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };

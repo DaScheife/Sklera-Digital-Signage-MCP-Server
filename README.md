@@ -41,7 +41,7 @@ Für den Betrieb mehrerer Sklera-Domains (z.B. SaaS plus mehrere On-Premise-Inst
 }
 ```
 
-Tools mit Instanz-Unterstützung akzeptieren einen optionalen Parameter `instance` (Name aus `instances`). Ohne Angabe wird die unter `default` definierte Instanz verwendet; fehlt `default`, gilt die erste Instanz.
+**Ab Version 0.6.0 akzeptiert _jedes_ Tool den optionalen Parameter `instance`** (Name aus `instances`) – nicht mehr nur `sklera_list_users` und die Roommanager-Tools. Ohne Angabe wird die unter `default` definierte Instanz verwendet; fehlt `default`, gilt die erste Instanz. Damit lassen sich Channels, Screens, Playlists, Items, Playouts, Reporting usw. gezielt auf einer beliebigen konfigurierten Domain abfragen. Das gilt gleichermaßen für `SKLERA_INSTANCES` (stdio), den Header `X-Sklera-Instances` (HTTP) und Mehrinstanz-OAuth-Anbindungen.
 
 ## Transport
 
