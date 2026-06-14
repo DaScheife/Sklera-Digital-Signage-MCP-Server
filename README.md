@@ -178,6 +178,29 @@ Cloudflare Tunnel), nicht auf `localhost`. Ohne TLS funktioniert der Flow in Cla
 4. Das Token wird gegen `/data/api/channels/list` geprüft und an den ausgestellten
    Bearer-Token gebunden. Ab dann sendet Claude den Bearer-Token automatisch mit.
 
+#### Mehrere Instanzen über eine OAuth-Anbindung (ab 0.5.0)
+
+Eine einzige OAuth-Anbindung kann mehrere Sklera-Instanzen binden. Auf der Login-Seite
+klappt der Bereich **„Erweitert: mehrere Instanzen verbinden"** ein Textfeld auf, in das
+ein Instanzen-JSON im selben Format wie `SKLERA_INSTANCES` eingetragen wird:
+
+```json
+{
+  "default": "my",
+  "instances": {
+    "my":     { "baseUrl": "https://my.sklera.tv",        "apiToken": "TOKEN_A" },
+    "onprem": { "baseUrl": "https://sklera.example.net",   "apiToken": "TOKEN_B" }
+  }
+}
+```
+
+Ist das Feld ausgefüllt, hat es Vorrang vor dem einzelnen Token darüber. **Jede Instanz
+wird einzeln** gegen ihre `baseUrl` validiert; wird ein Token abgelehnt, nennt die
+Fehlerseite die betroffene Instanz. Nach erfolgreicher Autorisierung sind die Instanzen
+über den optionalen Tool-Parameter `instance` (Name aus `instances`) ansprechbar – ohne
+Angabe gilt `default` (bzw. die erste Instanz). Bleibt das Feld leer, verhält sich der
+Login wie bisher (einzelnes Token, optionale Instanz-URL).
+
 Die bisherigen Header-Varianten (`X-Sklera-Token`, `X-Sklera-Instances`) bleiben parallel
 nutzbar, etwa für die Einbindung per Konfigurationsdatei (Variante B).
 

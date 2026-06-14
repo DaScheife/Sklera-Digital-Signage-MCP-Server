@@ -13,6 +13,7 @@ import type {
   OAuthTokens,
   OAuthTokenRevocationRequest,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { InstanceConfig } from "./registry.js";
 
 /**
  * Self-contained OAuth 2.1 Authorization Server for the Sklera MCP server.
@@ -42,12 +43,22 @@ import type {
  *   provider returns from challengeForAuthorizationCode().
  */
 
+/**
+ * One OAuth session can bind several Sklera instances. The shape is identical
+ * to the SKLERA_INSTANCES environment variable and the x-sklera-instances
+ * header, so a single connector can address them via the `instance` tool
+ * parameter. `default` is always populated once normalized.
+ */
+export interface OAuthInstanceMap {
+  default: string;
+  instances: Record<string, InstanceConfig>;
+}
+
 interface StoredAuthCode {
   clientId: string;
   codeChallenge: string;
   redirectUri: string;
-  skleraToken: string;
-  baseUrl: string;
+  instances: OAuthInstanceMap;
   scopes: string[];
   resource?: string;
   expiresAt: number;
@@ -55,8 +66,7 @@ interface StoredAuthCode {
 
 interface StoredAccessToken {
   clientId: string;
-  skleraToken: string;
-  baseUrl: string;
+  instances: OAuthInstanceMap;
   scopes: string[];
   resource?: string;
   expiresAt: number;
@@ -64,21 +74,46 @@ interface StoredAccessToken {
 
 interface StoredRefreshToken {
   clientId: string;
-  skleraToken: string;
-  baseUrl: string;
+  instances: OAuthInstanceMap;
   scopes: string[];
   resource?: string;
 }
 
+/**
+ * Raw token entry as read from OAUTH_STORE_FILE. Accepts both the current
+ * multi-instance shape (`instances`) and the legacy single-instance shape
+ * (`skleraToken` + `baseUrl`) so older store files keep working.
+ */
+interface RawStoredToken {
+  clientId: string;
+  instances?: OAuthInstanceMap;
+  skleraToken?: string;
+  baseUrl?: string;
+  scopes?: string[];
+  resource?: string;
+  expiresAt?: number;
+}
+
 interface PersistShape {
   clients: Record<string, OAuthClientInformationFull>;
-  accessTokens: Record<string, StoredAccessToken>;
-  refreshTokens: Record<string, StoredRefreshToken>;
+  accessTokens: Record<string, RawStoredToken>;
+  refreshTokens: Record<string, RawStoredToken>;
 }
 
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1 hour
 const AUTH_CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_SKLERA_URL = "https://my.sklera.tv";
+const INSTANCES_JSON_PLACEHOLDER = JSON.stringify(
+  {
+    default: "my",
+    instances: {
+      my: { baseUrl: "https://my.sklera.tv", apiToken: "TOKEN_A" },
+      onprem: { baseUrl: "https://sklera.example.net", apiToken: "TOKEN_B" },
+    },
+  },
+  null,
+  2
+);
 
 function randomId(bytes = 32): string {
   return randomBytes(bytes).toString("hex");
@@ -127,6 +162,81 @@ async function validateSkleraToken(
       }`,
     };
   }
+}
+
+function normalizeBaseUrl(baseUrl: string | undefined): string {
+  return (baseUrl || DEFAULT_SKLERA_URL).trim().replace(/\/$/, "");
+}
+
+/** Wraps a single token/baseUrl pair as a one-entry instance map. */
+function singleInstanceMap(baseUrl: string | undefined, apiToken: string): OAuthInstanceMap {
+  return {
+    default: "default",
+    instances: { default: { baseUrl: normalizeBaseUrl(baseUrl), apiToken: apiToken.trim() } },
+  };
+}
+
+/**
+ * Normalizes a raw store entry into an OAuthInstanceMap. New entries carry an
+ * `instances` map directly; legacy entries (only skleraToken + baseUrl) are
+ * mapped onto a single instance named "default" for backward compatibility.
+ */
+function instanceMapFromStored(raw: RawStoredToken): OAuthInstanceMap {
+  if (raw.instances && Object.keys(raw.instances.instances ?? {}).length > 0) {
+    const def = raw.instances.default;
+    const names = Object.keys(raw.instances.instances);
+    return {
+      default: def && names.includes(def) ? def : names[0],
+      instances: raw.instances.instances,
+    };
+  }
+  return singleInstanceMap(raw.baseUrl, raw.skleraToken ?? "");
+}
+
+/**
+ * Parses and shape-validates the advanced multi-instance JSON from the login
+ * form (identical format to SKLERA_INSTANCES). Base URLs are normalized; the
+ * default falls back to the first instance. Returns an error message string on
+ * any structural problem instead of throwing, so the caller can re-render the
+ * login page.
+ */
+function parseInstancesJson(json: string): { map: OAuthInstanceMap } | { error: string } {
+  let parsed: { default?: string; instances?: Record<string, Partial<InstanceConfig>> };
+  try {
+    parsed = JSON.parse(json) as typeof parsed;
+  } catch (err) {
+    return { error: `Instanzen-JSON ist kein gültiges JSON: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  const rawInstances = parsed.instances ?? {};
+  const names = Object.keys(rawInstances);
+  if (names.length === 0) {
+    return { error: "Instanzen-JSON enthält keine Instanzen (Feld \"instances\" fehlt oder ist leer)." };
+  }
+  const instances: Record<string, InstanceConfig> = {};
+  for (const name of names) {
+    const cfg = rawInstances[name];
+    if (!cfg || !cfg.baseUrl || !cfg.apiToken) {
+      return { error: `Instanz "${escapeHtml(name)}" muss sowohl baseUrl als auch apiToken definieren.` };
+    }
+    instances[name] = { baseUrl: normalizeBaseUrl(cfg.baseUrl), apiToken: cfg.apiToken.trim() };
+  }
+  const def = parsed.default && names.includes(parsed.default) ? parsed.default : names[0];
+  return { map: { default: def, instances } };
+}
+
+/**
+ * Validates every instance in the map against its own base URL. Returns the
+ * first failure (naming the rejected instance) so the user gets an actionable
+ * message; on success all tokens are confirmed accepted.
+ */
+async function validateInstanceMap(map: OAuthInstanceMap): Promise<{ ok: boolean; message?: string }> {
+  for (const [name, cfg] of Object.entries(map.instances)) {
+    const result = await validateSkleraToken(cfg.baseUrl, cfg.apiToken);
+    if (!result.ok) {
+      return { ok: false, message: `Instanz "${escapeHtml(name)}": ${result.message ?? "Token-Validierung fehlgeschlagen."}` };
+    }
+  }
+  return { ok: true };
 }
 
 class InMemoryClientsStore implements OAuthRegisteredClientsStore {
@@ -180,8 +290,29 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
       const raw = readFileSync(this.storeFile, "utf8");
       const data = JSON.parse(raw) as PersistShape;
       this.clients = new Map(Object.entries(data.clients ?? {}));
-      this.accessTokens = new Map(Object.entries(data.accessTokens ?? {}));
-      this.refreshTokens = new Map(Object.entries(data.refreshTokens ?? {}));
+      this.accessTokens = new Map(
+        Object.entries(data.accessTokens ?? {}).map(([token, entry]) => [
+          token,
+          {
+            clientId: entry.clientId,
+            instances: instanceMapFromStored(entry),
+            scopes: entry.scopes ?? [],
+            resource: entry.resource,
+            expiresAt: entry.expiresAt ?? 0,
+          } satisfies StoredAccessToken,
+        ])
+      );
+      this.refreshTokens = new Map(
+        Object.entries(data.refreshTokens ?? {}).map(([token, entry]) => [
+          token,
+          {
+            clientId: entry.clientId,
+            instances: instanceMapFromStored(entry),
+            scopes: entry.scopes ?? [],
+            resource: entry.resource,
+          } satisfies StoredRefreshToken,
+        ])
+      );
     } catch {
       // No store yet or unreadable: start empty.
     }
@@ -253,14 +384,32 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
     resource: string;
     skleraToken: string;
     baseUrl: string;
+    instancesJson?: string;
   }): Promise<{ redirect: string } | { error: string }> {
     const client = this.clients.get(input.clientId);
     if (!client) return { error: "Unbekannte client_id." };
     if (!client.redirect_uris.includes(input.redirectUri)) {
       return { error: "redirect_uri ist fuer diesen Client nicht registriert." };
     }
-    const baseUrl = (input.baseUrl || DEFAULT_SKLERA_URL).trim().replace(/\/$/, "");
-    const validation = await validateSkleraToken(baseUrl, input.skleraToken.trim());
+
+    // Advanced mode (non-empty instances JSON) takes precedence; otherwise fall
+    // back to the simple single-token form.
+    const instancesJson = input.instancesJson?.trim();
+    let instances: OAuthInstanceMap;
+    if (instancesJson) {
+      const parsed = parseInstancesJson(instancesJson);
+      if ("error" in parsed) return { error: parsed.error };
+      instances = parsed.map;
+    } else {
+      if (!input.skleraToken.trim()) {
+        return { error: "Bitte ein Sklera API-Token angeben oder im erweiterten Modus ein Instanzen-JSON hinterlegen." };
+      }
+      instances = singleInstanceMap(input.baseUrl, input.skleraToken);
+    }
+
+    // Validate every instance individually so a single bad token is reported by
+    // name rather than failing the whole flow opaquely.
+    const validation = await validateInstanceMap(instances);
     if (!validation.ok) {
       return { error: validation.message ?? "Token-Validierung fehlgeschlagen." };
     }
@@ -270,8 +419,7 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
       clientId: input.clientId,
       codeChallenge: input.codeChallenge,
       redirectUri: input.redirectUri,
-      skleraToken: input.skleraToken.trim(),
-      baseUrl,
+      instances,
       scopes: input.scope ? input.scope.split(" ").filter(Boolean) : [],
       resource: input.resource || undefined,
       expiresAt: Date.now() + AUTH_CODE_TTL_MS,
@@ -315,8 +463,7 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
 
     return this.mintTokens({
       clientId: entry.clientId,
-      skleraToken: entry.skleraToken,
-      baseUrl: entry.baseUrl,
+      instances: entry.instances,
       scopes: entry.scopes,
       resource: entry.resource,
     });
@@ -336,8 +483,7 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
     this.refreshTokens.delete(refreshToken);
     return this.mintTokens({
       clientId: entry.clientId,
-      skleraToken: entry.skleraToken,
-      baseUrl: entry.baseUrl,
+      instances: entry.instances,
       scopes: scopes && scopes.length ? scopes : entry.scopes,
       resource: entry.resource,
     });
@@ -351,13 +497,21 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
       this.persist();
       throw new Error("access token expired");
     }
+    // The default instance is mirrored into the legacy skleraToken/baseUrl
+    // fields so older consumers keep working; multi-instance consumers read the
+    // full `instances` map.
+    const def = entry.instances.instances[entry.instances.default];
     return {
       token,
       clientId: entry.clientId,
       scopes: entry.scopes,
       expiresAt: entry.expiresAt,
       resource: entry.resource ? new URL(entry.resource) : undefined,
-      extra: { skleraToken: entry.skleraToken, baseUrl: entry.baseUrl },
+      extra: {
+        instances: entry.instances,
+        skleraToken: def?.apiToken,
+        baseUrl: def?.baseUrl,
+      },
     };
   }
 
@@ -374,8 +528,7 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
 
   private mintTokens(src: {
     clientId: string;
-    skleraToken: string;
-    baseUrl: string;
+    instances: OAuthInstanceMap;
     scopes: string[];
     resource?: string;
   }): OAuthTokens {
@@ -385,16 +538,14 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
 
     this.accessTokens.set(accessToken, {
       clientId: src.clientId,
-      skleraToken: src.skleraToken,
-      baseUrl: src.baseUrl,
+      instances: src.instances,
       scopes: src.scopes,
       resource: src.resource,
       expiresAt,
     });
     this.refreshTokens.set(refreshToken, {
       clientId: src.clientId,
-      skleraToken: src.skleraToken,
-      baseUrl: src.baseUrl,
+      instances: src.instances,
       scopes: src.scopes,
       resource: src.resource,
     });
@@ -439,11 +590,14 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
     h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
     p { color: #9aa1ab; font-size: 0.9rem; margin: 0 0 1.25rem; }
     label { display: block; font-size: 0.85rem; margin: 0.75rem 0 0.25rem; }
-    input[type=text], input[type=password] { width: 100%; box-sizing: border-box; padding: 0.6rem;
-            border-radius: 8px; border: 1px solid #333; background: #0f1115; color: #e6e8eb; }
+    input[type=text], input[type=password], textarea { width: 100%; box-sizing: border-box; padding: 0.6rem;
+            border-radius: 8px; border: 1px solid #333; background: #0f1115; color: #e6e8eb; font-family: inherit; }
+    textarea { min-height: 8rem; resize: vertical; font-family: ui-monospace, monospace; font-size: 0.8rem; }
     button { margin-top: 1.25rem; width: 100%; padding: 0.7rem; border: 0; border-radius: 8px;
              background: #3b82f6; color: white; font-weight: 600; cursor: pointer; }
     .hint { font-size: 0.75rem; color: #6b7280; margin-top: 0.4rem; }
+    details { margin-top: 1.25rem; border-top: 1px solid #2a2e35; padding-top: 0.75rem; }
+    summary { cursor: pointer; font-size: 0.85rem; color: #9aa1ab; }
   </style>
 </head>
 <body>
@@ -453,10 +607,17 @@ export class SkleraOAuthProvider implements OAuthServerProvider {
     <form method="POST" action="${escapeHtml(this.loginPath)}">
         ${hidden}
         <label for="sklera_token">Sklera API-Token</label>
-        <input type="password" id="sklera_token" name="sklera_token" required autocomplete="off">
+        <input type="password" id="sklera_token" name="sklera_token" autocomplete="off">
         <label for="base_url">Sklera-Instanz (optional)</label>
         <input type="text" id="base_url" name="base_url" placeholder="${DEFAULT_SKLERA_URL}" autocomplete="off">
         <div class="hint">Leer lassen fuer ${DEFAULT_SKLERA_URL}. Fuer On-Premise die volle URL eintragen.</div>
+        <details>
+          <summary>Erweitert: mehrere Instanzen verbinden</summary>
+          <label for="instances_json">Instanzen-JSON (Format wie SKLERA_INSTANCES)</label>
+          <textarea id="instances_json" name="instances_json" autocomplete="off" spellcheck="false"
+            placeholder='${escapeHtml(INSTANCES_JSON_PLACEHOLDER)}'></textarea>
+          <div class="hint">Ist dieses Feld ausgefuellt, hat es Vorrang vor dem einzelnen Token oben. Jede Instanz wird einzeln geprueft; ueber den Tool-Parameter "instance" waehlbar.</div>
+        </details>
         <button type="submit">Autorisieren</button>
     </form>
   </div>

@@ -5,6 +5,42 @@ Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokument
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.5.0] - 2026-06-14
+
+### Hinzugefügt
+- **Mehrinstanz-Unterstützung im OAuth-Login (Remote-Modus):** Eine einzige
+  OAuth-Anbindung kann jetzt mehrere Sklera-Instanzen binden, ansprechbar über
+  den bereits existierenden Tool-Parameter `instance`.
+  - Die Login-Seite (`SkleraOAuthProvider.renderLoginPage`) zeigt standardmäßig
+    weiterhin das einfache Formular (ein Token, optionale Instanz-URL). Ein neuer,
+    einklappbarer Bereich **„Erweitert: mehrere Instanzen verbinden"** nimmt ein
+    Instanzen-JSON im Format von `SKLERA_INSTANCES` entgegen (kein JavaScript,
+    keine externen Abhängigkeiten).
+  - Ist das Instanzen-JSON ausgefüllt, hat es Vorrang vor dem Einzel-Token. **Jede
+    Instanz wird einzeln** über `validateSkleraToken` gegen ihre `baseUrl` geprüft;
+    schlägt eine fehl, nennt die Fehlerseite die betroffene Instanz.
+  - Die gesamte Instanzen-Abbildung wird durch den Authorization Code, die Access-
+    und Refresh-Tokens durchgereicht. `verifyAccessToken` liefert sie in
+    `AuthInfo.extra.instances`; zusätzlich werden die Felder `skleraToken`/`baseUrl`
+    der Default-Instanz für Abwärtskompatibilität gespiegelt.
+- Neue wiederverwendbare Funktion `buildRegistryFromInstances(parsed, label)` in
+  `src/services/registry.ts`. Die JSON-Validierungs- und Aufbaulogik aus
+  `loadRegistryFromEnv` und `loadRegistryFromHeaders` wurde dorthin extrahiert und
+  wird nun zusätzlich im OAuth-Zweig von `index.ts` genutzt (keine Duplizierung).
+
+### Geändert
+- `SERVER_VERSION` auf `0.5.0`.
+- Der OAuth-Bearer-Zweig in `index.ts` baut die `ClientRegistry` aus der im Token
+  gespeicherten Instanzen-Abbildung statt aus einem einzelnen Token.
+
+### Kompatibilität
+- **stdio-Modus** (`SKLERA_API_TOKEN`, `SKLERA_INSTANCES`) und die **Header-Varianten**
+  (`X-Sklera-Token`, `X-Sklera-Instances`) bleiben vollständig unverändert.
+- **Persist-Format abwärtskompatibel:** Bestehende `OAUTH_STORE_FILE`-Dateien im
+  alten Schema (nur `skleraToken` + `baseUrl` pro Token) werden beim Laden weiterhin
+  akzeptiert und intern auf eine Instanz `default` abgebildet. Bestehende
+  Single-Instanz-Anbindungen funktionieren unverändert weiter.
+
 ## [0.4.0] - 2026-06-12
 
 ### Hinzugefügt

@@ -7,6 +7,43 @@ import { SkleraClient, SkleraConfig } from "./client.js";
 export type InstanceConfig = SkleraConfig;
 
 /**
+ * Parsed multi-instance payload, identical in shape to the SKLERA_INSTANCES
+ * environment variable and the x-sklera-instances header. Reused by the env,
+ * header and OAuth code paths.
+ */
+export interface InstancesPayload {
+  default?: string;
+  instances?: Record<string, InstanceConfig>;
+}
+
+/**
+ * Validates a parsed multi-instance payload and builds a ClientRegistry from it.
+ *
+ * Shared by loadRegistryFromEnv, loadRegistryFromHeaders and the OAuth branch in
+ * index.ts so the validation rules (non-empty instances, each with baseUrl and
+ * apiToken, default falls back to the first instance) live in exactly one place.
+ *
+ * @param parsed the already-JSON-parsed payload
+ * @param label  source name used in error messages (e.g. "SKLERA_INSTANCES")
+ */
+export function buildRegistryFromInstances(
+  parsed: InstancesPayload,
+  label: string
+): ClientRegistry {
+  const instances = parsed.instances ?? {};
+  const names = Object.keys(instances);
+  if (names.length === 0) {
+    throw new Error(`${label} contains no instances`);
+  }
+  for (const [name, cfg] of Object.entries(instances)) {
+    if (!cfg || !cfg.baseUrl || !cfg.apiToken) {
+      throw new Error(`Instance "${name}" must define both baseUrl and apiToken`);
+    }
+  }
+  return new ClientRegistry(instances, parsed.default ?? names[0]);
+}
+
+/**
  * Holds one SkleraClient per configured Sklera instance (domain).
  *
  * Supports both the legacy single-instance setup
@@ -78,27 +115,13 @@ export function loadRegistryFromEnv(): ClientRegistry {
   const instancesRaw = process.env.SKLERA_INSTANCES;
 
   if (instancesRaw) {
-    let parsed: { default?: string; instances?: Record<string, InstanceConfig> };
+    let parsed: InstancesPayload;
     try {
-      parsed = JSON.parse(instancesRaw) as typeof parsed;
+      parsed = JSON.parse(instancesRaw) as InstancesPayload;
     } catch (err) {
       throw new Error(`SKLERA_INSTANCES is not valid JSON: ${String(err)}`);
     }
-
-    const instances = parsed.instances ?? {};
-    const names = Object.keys(instances);
-    if (names.length === 0) {
-      throw new Error("SKLERA_INSTANCES contains no instances");
-    }
-
-    for (const [name, cfg] of Object.entries(instances)) {
-      if (!cfg || !cfg.baseUrl || !cfg.apiToken) {
-        throw new Error(`Instance "${name}" must define both baseUrl and apiToken`);
-      }
-    }
-
-    const defaultName = parsed.default ?? names[0];
-    return new ClientRegistry(instances, defaultName);
+    return buildRegistryFromInstances(parsed, "SKLERA_INSTANCES");
   }
 
   // Legacy single-instance configuration.
@@ -136,23 +159,13 @@ export function loadRegistryFromHeaders(
 
   const instancesRaw = single("x-sklera-instances");
   if (instancesRaw) {
-    let parsed: { default?: string; instances?: Record<string, InstanceConfig> };
+    let parsed: InstancesPayload;
     try {
-      parsed = JSON.parse(instancesRaw) as typeof parsed;
+      parsed = JSON.parse(instancesRaw) as InstancesPayload;
     } catch (err) {
       throw new Error(`x-sklera-instances header is not valid JSON: ${String(err)}`);
     }
-    const instances = parsed.instances ?? {};
-    const names = Object.keys(instances);
-    if (names.length === 0) {
-      throw new Error("x-sklera-instances header contains no instances");
-    }
-    for (const [name, cfg] of Object.entries(instances)) {
-      if (!cfg || !cfg.baseUrl || !cfg.apiToken) {
-        throw new Error(`Instance "${name}" must define both baseUrl and apiToken`);
-      }
-    }
-    return new ClientRegistry(instances, parsed.default ?? names[0]);
+    return buildRegistryFromInstances(parsed, "x-sklera-instances header");
   }
 
   const apiToken = single("x-sklera-token");

@@ -10,9 +10,11 @@ import express from "express";
 import {
   loadRegistryFromEnv,
   loadRegistryFromHeaders,
+  buildRegistryFromInstances,
   ClientRegistry,
 } from "./services/registry.js";
 import { SkleraOAuthProvider } from "./services/oauth.js";
+import type { OAuthInstanceMap } from "./services/oauth.js";
 import { registerChannelTools, registerScreenTools } from "./tools/screens.js";
 import { registerPlaylistTools, registerNodeTools } from "./tools/playlists.js";
 import { registerItemTools, registerPlayoutTools, registerMessageTools, registerCustomValueTools } from "./tools/content.js";
@@ -20,7 +22,7 @@ import { registerReportingTools } from "./tools/reporting.js";
 import { registerUserTools } from "./tools/users.js";
 import { registerRoomManagerTools } from "./tools/rooms.js";
 
-const SERVER_VERSION = "0.4.0";
+const SERVER_VERSION = "0.5.0";
 
 /**
  * Builds a fully configured McpServer for the given registry.
@@ -137,6 +139,7 @@ async function runHTTP(): Promise<void> {
           resource: body.resource ?? "",
           skleraToken: body.sklera_token ?? "",
           baseUrl: body.base_url ?? "",
+          instancesJson: body.instances_json ?? "",
         });
         if ("error" in result) {
           res
@@ -189,19 +192,38 @@ async function runHTTP(): Promise<void> {
           next(err);
           return;
         }
-        const extra = req.auth?.extra as { skleraToken?: string; baseUrl?: string } | undefined;
-        if (!extra?.skleraToken) {
-          res.status(401).json({
+        const extra = req.auth?.extra as
+          | { instances?: OAuthInstanceMap; skleraToken?: string; baseUrl?: string }
+          | undefined;
+
+        // Preferred path: the token carries a full instance map (multi-instance
+        // OAuth). Legacy tokens carry only skleraToken/baseUrl and are treated
+        // as a single instance named "default".
+        let registry: ClientRegistry;
+        try {
+          if (extra?.instances && Object.keys(extra.instances.instances ?? {}).length > 0) {
+            registry = buildRegistryFromInstances(extra.instances, "OAuth token instances");
+          } else if (extra?.skleraToken) {
+            registry = new ClientRegistry(
+              { default: { baseUrl: extra.baseUrl ?? "https://my.sklera.tv", apiToken: extra.skleraToken } },
+              "default"
+            );
+          } else {
+            res.status(401).json({
+              jsonrpc: "2.0",
+              error: { code: -32001, message: "Token carries no Sklera credentials" },
+              id: null,
+            });
+            return;
+          }
+        } catch (buildErr) {
+          res.status(400).json({
             jsonrpc: "2.0",
-            error: { code: -32001, message: "Token carries no Sklera credentials" },
+            error: { code: -32000, message: buildErr instanceof Error ? buildErr.message : String(buildErr) },
             id: null,
           });
           return;
         }
-        const registry = new ClientRegistry(
-          { default: { baseUrl: extra.baseUrl ?? "https://my.sklera.tv", apiToken: extra.skleraToken } },
-          "default"
-        );
         void handleMcpRequest(req, res, registry).catch(next);
       });
       return;
