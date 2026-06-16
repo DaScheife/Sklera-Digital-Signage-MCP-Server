@@ -1,5 +1,34 @@
-import { describe, it, expect } from "vitest";
-import { formatToolError, successText } from "./client.js";
+import { describe, it, expect, afterEach } from "vitest";
+import { formatToolError, successText, resolveTimeoutMs, DEFAULT_HTTP_TIMEOUT_MS } from "./client.js";
+
+describe("resolveTimeoutMs", () => {
+  const original = process.env.SKLERA_HTTP_TIMEOUT_MS;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.SKLERA_HTTP_TIMEOUT_MS;
+    else process.env.SKLERA_HTTP_TIMEOUT_MS = original;
+  });
+
+  it("defaults to 60000ms when the env var is unset", () => {
+    delete process.env.SKLERA_HTTP_TIMEOUT_MS;
+    expect(resolveTimeoutMs()).toBe(DEFAULT_HTTP_TIMEOUT_MS);
+    expect(DEFAULT_HTTP_TIMEOUT_MS).toBe(60000);
+  });
+
+  it("uses a valid numeric override from the env var", () => {
+    process.env.SKLERA_HTTP_TIMEOUT_MS = "90000";
+    expect(resolveTimeoutMs()).toBe(90000);
+  });
+
+  it("falls back to the default for non-numeric or non-positive values", () => {
+    process.env.SKLERA_HTTP_TIMEOUT_MS = "abc";
+    expect(resolveTimeoutMs()).toBe(DEFAULT_HTTP_TIMEOUT_MS);
+    process.env.SKLERA_HTTP_TIMEOUT_MS = "0";
+    expect(resolveTimeoutMs()).toBe(DEFAULT_HTTP_TIMEOUT_MS);
+    process.env.SKLERA_HTTP_TIMEOUT_MS = "-5";
+    expect(resolveTimeoutMs()).toBe(DEFAULT_HTTP_TIMEOUT_MS);
+  });
+});
 
 describe("successText", () => {
   it("formats an object as pretty-printed JSON", () => {

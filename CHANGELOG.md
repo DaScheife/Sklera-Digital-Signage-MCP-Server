@@ -5,6 +5,40 @@ Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokument
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.7.0] - 2026-06-16
+
+### Hinzugefügt
+- **Konfigurierbares HTTP-Timeout:** Neue Umgebungsvariable
+  `SKLERA_HTTP_TIMEOUT_MS` steuert das Timeout aller Sklera-API-Aufrufe zentral.
+  Der Default wurde von 15.000 ms auf **60.000 ms** angehoben, damit Aufrufe gegen
+  sehr große Instanzen (tausende Screens) nicht mehr vorzeitig abbrechen
+  (`resolveTimeoutMs()` in `src/services/client.ts`).
+- **`sklera_list_screens` – Filter, Paginierung und Feldprojektion:** Neue
+  optionale Parameter `channelId` (nur ein Channel), `limit`/`offset`
+  (seitenweise Abfrage) und `fields` (`core` = schlanke Standardprojektion mit
+  abgeleiteten Feldern `model`/`ip`, `full` = vollständige Objekte). Die Antwort
+  ist nun ein Envelope `{ total, offset, limit, returned, screens }`. Damit lassen
+  sich große Fleets innerhalb des Antwortgrößen-Limits abfragen.
+
+### Behoben
+- **`sklera_screen_connection_status` ignorierte `channelId`:** Die Sklera-API
+  liefert für diesen Endpunkt stets alle Channels, unabhängig vom übergebenen
+  `channelId`-Query-Parameter. Die Filterung erfolgt jetzt zuverlässig
+  **client-seitig** auf die Channel-Gruppe(n) mit passender `channelId`; zwei
+  verschiedene IDs liefern damit korrekt unterschiedliche Ergebnisse.
+
+### Geändert
+- `SERVER_VERSION` und `package.json` auf `0.7.0`.
+- `sklera_list_screens` liefert standardmäßig die schlanke `core`-Projektion statt
+  der vollständigen Objekte. Große Felder (`platformInfo`, `networkInfo`,
+  `operatingTimes`) sind nur noch mit `fields="full"` enthalten.
+
+### Kompatibilität
+- Additiv und abwärtskompatibel: bestehende Aufrufe ohne neue Parameter
+  funktionieren weiterhin. `sklera_list_screens` ohne Parameter liefert weiterhin
+  alle Screens – nun als Envelope mit schlanker `core`-Projektion (für die
+  vollständigen Objekte `fields="full"` setzen).
+
 ## [0.6.0] - 2026-06-14
 
 ### Hinzugefügt

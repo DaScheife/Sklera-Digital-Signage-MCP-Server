@@ -4,6 +4,74 @@ import { formatToolError, successText } from "../services/client.js";
 import { ClientRegistry } from "../services/registry.js";
 import { instanceField } from "./shared.js";
 
+/** Network block as returned per screen; shape varies by deviceType (LG vs. cordova). */
+interface NetworkInfo {
+  wifi?: { ipAddress?: string } | null;
+  wired?: { ipAddress?: string } | null;
+  interfaces?: Array<{ address?: string } | null> | null;
+  [key: string]: unknown;
+}
+
+/** Raw screen as returned by /screens/list. Only the fields we read are typed; the rest is preserved. */
+interface RawScreen {
+  channelId?: string;
+  platformInfo?: { modelName?: unknown } | null;
+  networkInfo?: NetworkInfo | null;
+  [key: string]: unknown;
+}
+
+/**
+ * Best-effort extraction of a screen's primary IPv4 address from its networkInfo.
+ * Handles the LG shape (`wifi`/`wired.ipAddress`) and the cordova shape
+ * (`interfaces[].address`). Returns undefined when no address is present.
+ */
+function extractIp(networkInfo: NetworkInfo | null | undefined): string | undefined {
+  if (!networkInfo || typeof networkInfo !== "object") return undefined;
+  if (networkInfo.wifi?.ipAddress) return networkInfo.wifi.ipAddress;
+  if (networkInfo.wired?.ipAddress) return networkInfo.wired.ipAddress;
+  if (Array.isArray(networkInfo.interfaces)) {
+    const iface = networkInfo.interfaces.find((i) => i && typeof i.address === "string");
+    if (iface?.address) return iface.address;
+  }
+  return undefined;
+}
+
+/**
+ * Projects a raw screen down to a slim set of core fields, deriving `model`
+ * from platformInfo and `ip` from networkInfo. Large nested objects
+ * (platformInfo, networkInfo, operatingTimes, holidays) are dropped. Fields
+ * that are absent stay undefined and are omitted by JSON serialization.
+ */
+function projectScreenCore(screen: RawScreen): Record<string, unknown> {
+  return {
+    _id: screen._id,
+    name: screen.name,
+    channelId: screen.channelId,
+    channelName: screen.channelName,
+    screenGroupId: screen.screenGroupId,
+    screenGroupName: screen.screenGroupName,
+    deviceType: screen.deviceType,
+    model: screen.platformInfo?.modelName,
+    resolution: screen.resolution,
+    buildVersion: screen.buildVersion,
+    ip: extractIp(screen.networkInfo),
+    registered: screen.registered,
+    updatedAt: screen.updatedAt,
+    // Connection-status fields are not part of /screens/list, but are kept here
+    // so the projection stays correct if a future response ever includes them.
+    connected: screen.connected,
+    isStandby: screen.isStandby,
+    lastUpdated: screen.lastUpdated,
+  };
+}
+
+/** Normalizes the /screens/list response (either a bare array or `{ screens: [...] }`) to an array. */
+function normalizeScreensList(data: unknown): RawScreen[] {
+  if (Array.isArray(data)) return data as RawScreen[];
+  const screens = (data as { screens?: unknown } | null)?.screens;
+  return Array.isArray(screens) ? (screens as RawScreen[]) : [];
+}
+
 export function registerChannelTools(server: McpServer, registry: ClientRegistry): void {
   server.registerTool(
     "sklera_list_channels",
@@ -32,18 +100,49 @@ export function registerScreenTools(server: McpServer, registry: ClientRegistry)
     "sklera_list_screens",
     {
       title: "List Screens",
-      description: `Returns all screens (players) across all accessible channels.
+      description: `Returns screens (players) across accessible channels.
 
-Each screen includes: _id, name, channelId, channelName, deviceType, resolution,
-buildVersion, screenGroupId, customId, address, operatingTimes, registered, updatedAt.
-Use _id as screenId in other screen tools.`,
-      inputSchema: { ...instanceField },
+By default each screen is projected to core fields only (fields="core"):
+_id, name, channelId, channelName, screenGroupId, screenGroupName, deviceType,
+model, resolution, buildVersion, ip, registered, updatedAt. Pass fields="full"
+to get the complete objects including platformInfo, networkInfo, operatingTimes.
+
+Use channelId to restrict to a single channel and limit/offset to page through
+large fleets (recommended for instances with thousands of screens to stay within
+the response size limit). The response is an envelope:
+{ total, offset, limit, returned, screens: [...] }. Use _id as screenId in other
+screen tools.`,
+      inputSchema: {
+        channelId: z.string().optional().describe("Optional: only screens of this channel"),
+        limit: z.number().int().positive().optional().describe("Optional: max screens to return (pagination)"),
+        offset: z.number().int().nonnegative().optional().describe("Optional: number of screens to skip (pagination)"),
+        fields: z
+          .enum(["core", "full"])
+          .optional()
+          .describe('Field projection: "core" (default, slim) or "full" (complete objects)'),
+        ...instanceField,
+      },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    async ({ instance }) => {
+    async ({ channelId, limit, offset, fields, instance }) => {
       try {
         const data = await registry.resolve(instance).get("/screens/list");
-        return { content: [{ type: "text", text: successText(data) }] };
+        const all = normalizeScreensList(data);
+        // The /screens/list endpoint does not reliably filter server-side, so
+        // channelId is applied client-side for predictable results.
+        const filtered = channelId ? all.filter((s) => s.channelId === channelId) : all;
+        const total = filtered.length;
+        const start = offset ?? 0;
+        const page = limit !== undefined ? filtered.slice(start, start + limit) : filtered.slice(start);
+        const screens = fields === "full" ? page : page.map(projectScreenCore);
+        return {
+          content: [
+            {
+              type: "text",
+              text: successText({ total, offset: start, limit: limit ?? null, returned: screens.length, screens }),
+            },
+          ],
+        };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
       }
@@ -75,21 +174,32 @@ and per-channel breakdown. Useful for fleet health monitoring.`,
     "sklera_screen_connection_status",
     {
       title: "Screen Connection Status",
-      description: `Returns real-time connection state for all screens.
+      description: `Returns real-time connection state, grouped by channel.
 
-Each entry contains: screenName, screenState, connected (boolean), isStandby, lastUpdated, warning.
-Optionally filter by channelId. Leave channelId empty to get status for all accessible channels.`,
+The response is an array of channel groups: { channelId, channelName, screenState: [...] },
+where each screenState entry contains: _id, screenName, screenState, connected (boolean),
+isStandby, lastUpdated, warning.
+
+Pass channelId to restrict the result to a single channel (recommended for large
+instances to stay within the response size limit). Filtering is applied client-side
+because the API ignores the channelId query parameter and always returns all channels.
+Leave channelId empty to get the status for all accessible channels.`,
       inputSchema: {
-        channelId: z.string().optional().describe("Optional: filter by channel ID"),
+        channelId: z.string().optional().describe("Optional: filter by channel ID (single channel)"),
         ...instanceField,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async ({ channelId, instance }) => {
       try {
-        const body = channelId ? { channelId } : {};
-        const data = await registry.resolve(instance).get("/screens/getConnectionStatus", body as Record<string, unknown>);
-        return { content: [{ type: "text", text: successText(data) }] };
+        const data = await registry.resolve(instance).get("/screens/getConnectionStatus");
+        // The API returns every channel regardless of any channelId param, so we
+        // filter the channel groups client-side when a channelId is requested.
+        const result =
+          channelId && Array.isArray(data)
+            ? (data as Array<{ channelId?: string }>).filter((group) => group.channelId === channelId)
+            : data;
+        return { content: [{ type: "text", text: successText(result) }] };
       } catch (err) {
         return { content: [{ type: "text", text: formatToolError(err) }], isError: true };
       }

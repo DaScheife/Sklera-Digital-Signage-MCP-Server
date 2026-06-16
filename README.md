@@ -22,10 +22,11 @@ npm run build
 
 ### Einzelne Instanz (Standard)
 
-| Variable            | Pflicht | Default                  | Beschreibung              |
-|---------------------|---------|--------------------------|---------------------------|
-| `SKLERA_API_TOKEN`  | Ja      | –                        | API-Token aus dem Backend |
-| `SKLERA_BASE_URL`   | Nein    | `https://my.sklera.tv`   | Für On-Premise-Instanzen  |
+| Variable                 | Pflicht | Default                  | Beschreibung                                                        |
+|--------------------------|---------|--------------------------|---------------------------------------------------------------------|
+| `SKLERA_API_TOKEN`       | Ja      | –                        | API-Token aus dem Backend                                           |
+| `SKLERA_BASE_URL`        | Nein    | `https://my.sklera.tv`   | Für On-Premise-Instanzen                                            |
+| `SKLERA_HTTP_TIMEOUT_MS` | Nein    | `60000`                  | HTTP-Timeout (ms) für alle Sklera-API-Aufrufe. Bei sehr großen Instanzen ggf. erhöhen. |
 
 ### Mehrere Instanzen (mehrere Sklera-Domains)
 
@@ -223,9 +224,9 @@ nutzbar, etwa für die Einbindung per Konfigurationsdatei (Variante B).
 - `sklera_list_users` – Alle sichtbaren Benutzerkonten auflisten (inkl. Channel-Zuordnung, Adresse, lastLogin); optionaler Parameter `instance` für Mehrdomänen-Betrieb
 
 ### Screens / Player
-- `sklera_list_screens` – Alle Screens auflisten
+- `sklera_list_screens` – Screens auflisten. Parameter: `channelId` (nur ein Channel), `limit`/`offset` (Paginierung), `fields` (`core` = schlanke Standardprojektion, `full` = vollständige Objekte inkl. `platformInfo`/`networkInfo`). Antwort als Envelope `{ total, offset, limit, returned, screens }`. Für große Instanzen (tausende Screens) `channelId` oder `limit`/`offset` verwenden, um innerhalb des Antwortlimits zu bleiben.
 - `sklera_screen_stats` – Online/Offline-Statistiken
-- `sklera_screen_connection_status` – Echtzeit-Verbindungsstatus
+- `sklera_screen_connection_status` – Echtzeit-Verbindungsstatus, gruppiert nach Channel. Optionaler `channelId`-Parameter filtert client-seitig auf einen Channel (die API ignoriert den Parameter und liefert sonst alle Channels).
 - `sklera_send_screen_command` – Fernbefehl senden (restart, reload, next, prev, ...)
 - `sklera_edit_screen` – Screen-Eigenschaften bearbeiten
 - `sklera_list_screengroups` – Screen-Gruppen eines Channels

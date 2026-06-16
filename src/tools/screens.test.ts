@@ -40,19 +40,101 @@ function setup() {
 }
 
 describe("sklera_list_screens", () => {
-  it("calls the /screens/list endpoint and returns the data as text", async () => {
+  it("calls the /screens/list endpoint and returns a paginated envelope of core fields", async () => {
     // Arrange
     const { handlers, client } = setup();
-    const apiResponse = [{ _id: "s1", name: "Lobby" }];
-    client.get.mockResolvedValue(apiResponse);
+    client.get.mockResolvedValue({ screens: [{ _id: "s1", name: "Lobby" }] });
 
     // Act
     const result = await handlers.get("sklera_list_screens")!({});
 
     // Assert
     expect(client.get).toHaveBeenCalledWith("/screens/list");
-    expect(result.content[0].text).toBe(successText(apiResponse));
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.total).toBe(1);
+    expect(payload.returned).toBe(1);
+    expect(payload.offset).toBe(0);
+    expect(payload.limit).toBeNull();
+    expect(payload.screens).toEqual([{ _id: "s1", name: "Lobby" }]);
     expect(result.isError).toBeUndefined();
+  });
+
+  it('defaults to core projection: drops platformInfo/networkInfo, derives model and ip', async () => {
+    // Arrange
+    const { handlers, client } = setup();
+    client.get.mockResolvedValue({
+      screens: [
+        {
+          _id: "s1",
+          name: "Lobby",
+          channelId: "c1",
+          platformInfo: { modelName: "43UM5N-HP", serialNumber: "secret" },
+          networkInfo: { wifi: { ipAddress: "192.168.2.35" } },
+          operatingTimes: { isActive: true },
+        },
+      ],
+    });
+
+    // Act
+    const result = await handlers.get("sklera_list_screens")!({});
+
+    // Assert
+    const screen = JSON.parse(result.content[0].text).screens[0];
+    expect(screen.model).toBe("43UM5N-HP");
+    expect(screen.ip).toBe("192.168.2.35");
+    expect(screen.platformInfo).toBeUndefined();
+    expect(screen.networkInfo).toBeUndefined();
+    expect(screen.operatingTimes).toBeUndefined();
+  });
+
+  it('fields="full" returns the complete unprojected objects', async () => {
+    // Arrange
+    const { handlers, client } = setup();
+    const full = { _id: "s1", platformInfo: { modelName: "X" }, networkInfo: { type: "wifi" } };
+    client.get.mockResolvedValue({ screens: [full] });
+
+    // Act
+    const result = await handlers.get("sklera_list_screens")!({ fields: "full" });
+
+    // Assert
+    expect(JSON.parse(result.content[0].text).screens[0]).toEqual(full);
+  });
+
+  it("filters by channelId client-side", async () => {
+    // Arrange
+    const { handlers, client } = setup();
+    client.get.mockResolvedValue({
+      screens: [
+        { _id: "s1", channelId: "c1" },
+        { _id: "s2", channelId: "c2" },
+      ],
+    });
+
+    // Act
+    const result = await handlers.get("sklera_list_screens")!({ channelId: "c2" });
+
+    // Assert
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.total).toBe(1);
+    expect(payload.screens.map((s: { _id: string }) => s._id)).toEqual(["s2"]);
+  });
+
+  it("applies limit and offset for pagination", async () => {
+    // Arrange
+    const { handlers, client } = setup();
+    client.get.mockResolvedValue({
+      screens: [{ _id: "s1" }, { _id: "s2" }, { _id: "s3" }, { _id: "s4" }],
+    });
+
+    // Act
+    const result = await handlers.get("sklera_list_screens")!({ limit: 2, offset: 1 });
+
+    // Assert
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.total).toBe(4);
+    expect(payload.offset).toBe(1);
+    expect(payload.limit).toBe(2);
+    expect(payload.screens.map((s: { _id: string }) => s._id)).toEqual(["s2", "s3"]);
   });
 
   it("returns an error result when the client throws", async () => {
@@ -121,6 +203,43 @@ describe("sklera_send_screen_command", () => {
       cmd: "device_restart",
       id: "s1",
     });
+  });
+});
+
+describe("sklera_screen_connection_status", () => {
+  const groups = [
+    { channelId: "c1", channelName: "One", screenState: [{ _id: "a" }] },
+    { channelId: "c2", channelName: "Two", screenState: [{ _id: "b" }] },
+  ];
+
+  it("returns all channel groups when no channelId is given", async () => {
+    // Arrange
+    const { handlers, client } = setup();
+    client.get.mockResolvedValue(groups);
+
+    // Act
+    const result = await handlers.get("sklera_screen_connection_status")!({});
+
+    // Assert: the API is called without params; full set is returned.
+    expect(client.get).toHaveBeenCalledWith("/screens/getConnectionStatus");
+    expect(JSON.parse(result.content[0].text)).toEqual(groups);
+  });
+
+  it("filters client-side so two different channelIds yield different results", async () => {
+    // Arrange
+    const { handlers, client } = setup();
+    client.get.mockResolvedValue(groups);
+
+    // Act
+    const r1 = await handlers.get("sklera_screen_connection_status")!({ channelId: "c1" });
+    const r2 = await handlers.get("sklera_screen_connection_status")!({ channelId: "c2" });
+
+    // Assert
+    const p1 = JSON.parse(r1.content[0].text);
+    const p2 = JSON.parse(r2.content[0].text);
+    expect(p1).toEqual([groups[0]]);
+    expect(p2).toEqual([groups[1]]);
+    expect(p1).not.toEqual(p2);
   });
 });
 

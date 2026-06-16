@@ -5,6 +5,24 @@ export interface SkleraConfig {
   apiToken: string;
 }
 
+/** Default HTTP timeout in milliseconds, used when SKLERA_HTTP_TIMEOUT_MS is unset or invalid. */
+export const DEFAULT_HTTP_TIMEOUT_MS = 60000;
+
+/**
+ * Resolves the HTTP timeout (ms) for all Sklera API calls.
+ *
+ * Controlled centrally via the SKLERA_HTTP_TIMEOUT_MS environment variable so
+ * large-instance calls (thousands of screens) no longer abort prematurely.
+ * Falls back to DEFAULT_HTTP_TIMEOUT_MS for unset, non-numeric or non-positive
+ * values.
+ */
+export function resolveTimeoutMs(): number {
+  const raw = process.env.SKLERA_HTTP_TIMEOUT_MS;
+  if (raw === undefined) return DEFAULT_HTTP_TIMEOUT_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_HTTP_TIMEOUT_MS;
+}
+
 export class SkleraClient {
   private http: AxiosInstance;
   private roomHttp: AxiosInstance;
@@ -14,9 +32,10 @@ export class SkleraClient {
   constructor(config: SkleraConfig) {
     this.apiToken = config.apiToken;
     this.baseUrl = config.baseUrl;
+    const timeout = resolveTimeoutMs();
     this.http = axios.create({
       baseURL: `${config.baseUrl}/data/api`,
-      timeout: 15000,
+      timeout,
       headers: { "Content-Type": "application/json" },
     });
     // Roommanager lives under a different base path (/channelApi/roomManager)
@@ -25,7 +44,7 @@ export class SkleraClient {
     // remains untouched.
     this.roomHttp = axios.create({
       baseURL: `${config.baseUrl}/channelApi/roomManager`,
-      timeout: 15000,
+      timeout,
     });
   }
 

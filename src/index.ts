@@ -22,7 +22,7 @@ import { registerReportingTools } from "./tools/reporting.js";
 import { registerUserTools } from "./tools/users.js";
 import { registerRoomManagerTools } from "./tools/rooms.js";
 
-const SERVER_VERSION = "0.6.0";
+const SERVER_VERSION = "0.7.0";
 
 /**
  * Builds a fully configured McpServer for the given registry.
