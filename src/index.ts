@@ -21,8 +21,11 @@ import { registerItemTools, registerPlayoutTools, registerMessageTools, register
 import { registerReportingTools } from "./tools/reporting.js";
 import { registerUserTools } from "./tools/users.js";
 import { registerRoomManagerTools } from "./tools/rooms.js";
+import { registerInstanceTools } from "./tools/instances.js";
+import { registerProvisioningTools } from "./tools/provisioning.js";
+import { getSharedInstanceStore } from "./services/instanceStore.js";
 
-const SERVER_VERSION = "0.7.0";
+const SERVER_VERSION = "0.8.0";
 
 /**
  * Builds a fully configured McpServer for the given registry.
@@ -37,6 +40,12 @@ function buildServer(registry: ClientRegistry): McpServer {
     version: SERVER_VERSION,
   });
 
+  // Single attach point for the runtime instance store: every server (stdio
+  // once, HTTP per request) flows through buildServer, so the registry always
+  // sees dynamically added instances (read fresh from the store per request).
+  const instanceStore = getSharedInstanceStore();
+  registry.attachDynamicStore(instanceStore);
+
   // Every tool receives the full registry and resolves its target instance from
   // the optional `instance` parameter, falling back to the default instance.
   registerChannelTools(server, registry);
@@ -50,6 +59,8 @@ function buildServer(registry: ClientRegistry): McpServer {
   registerReportingTools(server, registry);
   registerUserTools(server, registry);
   registerRoomManagerTools(server, registry);
+  registerInstanceTools(server, registry, instanceStore);
+  registerProvisioningTools(server, registry);
 
   return server;
 }

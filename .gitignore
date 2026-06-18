@@ -4,3 +4,6 @@ dist/
 .env.local
 *.log
 oauth-store.json
+dynamic-instances.json
+dynamic-instances.json.key
+*.key

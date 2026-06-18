@@ -1,6 +1,6 @@
 # sklera-mcp-server
 
-Version 0.4.0
+Version 0.8.0
 
 MCP Server für die Sklera Digital Signage Data API v1.
 
@@ -43,6 +43,22 @@ Für den Betrieb mehrerer Sklera-Domains (z.B. SaaS plus mehrere On-Premise-Inst
 ```
 
 **Ab Version 0.6.0 akzeptiert _jedes_ Tool den optionalen Parameter `instance`** (Name aus `instances`) – nicht mehr nur `sklera_list_users` und die Roommanager-Tools. Ohne Angabe wird die unter `default` definierte Instanz verwendet; fehlt `default`, gilt die erste Instanz. Damit lassen sich Channels, Screens, Playlists, Items, Playouts, Reporting usw. gezielt auf einer beliebigen konfigurierten Domain abfragen. Das gilt gleichermaßen für `SKLERA_INSTANCES` (stdio), den Header `X-Sklera-Instances` (HTTP) und Mehrinstanz-OAuth-Anbindungen.
+
+### Laufzeit-Instanzverwaltung (Muster A, ab 0.8.0)
+
+Zusätzlich zu den statisch konfigurierten Instanzen lassen sich Instanzen **zur Laufzeit** ergänzen – ohne Neustart und ohne erneutes Verbinden. Dynamische Instanzen werden in einem **lokalen, verschlüsselten Speicher** abgelegt und bei **jedem** Request frisch gelesen und mit den statischen Instanzen zusammengeführt. Verwaltet wird das über die Tools `sklera_add_instance`, `sklera_list_instances`, `sklera_test_instance` und `sklera_remove_instance` (siehe Tool-Liste).
+
+| Variable                          | Pflicht | Default                    | Beschreibung                                                                                              |
+|-----------------------------------|---------|----------------------------|----------------------------------------------------------------------------------------------------------|
+| `SKLERA_DYNAMIC_INSTANCES_FILE`   | Nein    | `dynamic-instances.json`   | Pfad der JSON-Datei für dynamisch hinzugefügte Instanzen.                                                 |
+| `SKLERA_INSTANCE_SECRET`          | Nein    | (zufälliger Key, persistiert) | Geheimnis zur Ableitung des AES-256-GCM-Schlüssels. Empfohlen, damit Tokens nach einem Neustart entschlüsselbar bleiben. Ohne diese Variable wird ein zufälliger Schlüssel erzeugt und in einer `.key`-Datei (Modus 0600) neben dem Store abgelegt. |
+
+Hinweise:
+
+- **Tokens werden verschlüsselt at rest gespeichert** (AES-256-GCM) und nie im Klartext geloggt oder ausgegeben; Listen zeigen nur die letzten 4 Zeichen maskiert.
+- **Statisch gewinnt:** Ein dynamischer Instanzname, der mit einer statisch konfigurierten Instanz kollidiert, wird abgewiesen (statische Instanzen sind nicht überschreibbar).
+- `sklera_remove_instance` betrifft **ausschließlich die lokale Konnektor-Konfiguration** und ruft **keine** Sklera-API auf – es löscht nichts in Sklera.
+- Der Store ist **prozess-global** (nicht pro OAuth-User getrennt). Für den selbst betriebenen Einzeloperator-Betrieb ist das eine bewusste Vereinfachung.
 
 ## Transport
 
@@ -215,7 +231,19 @@ nutzbar, etwa für die Einbindung per Konfigurationsdatei (Variante B).
 - Wird der Server neu gestartet und ist `OAUTH_STORE_FILE` nicht gesetzt, müssen alle
   Nutzer sich neu autorisieren.
 
-## Verfügbare Tools (27)
+## Verfügbare Tools (33)
+
+### Instanzverwaltung (Laufzeit, ab 0.8.0)
+- `sklera_add_instance` – Dynamische Instanz anlegen/aktualisieren (`name`, `baseUrl`, `apiToken`, optional `label`). Validiert Name (eindeutig, `[A-Za-z0-9_-]`), URL-Form und nicht-leeres Token; Token wird verschlüsselt gespeichert. Sofort über `instance` nutzbar, ohne Reconnect.
+- `sklera_list_instances` – Alle Instanzen auflisten (statisch + dynamisch) mit Name, baseUrl, Label, Herkunft und **maskiertem** Token (nie im Klartext).
+- `sklera_test_instance` – Token einer Instanz mit einem leichten READ-Call (`/channels/list`) prüfen; meldet Erfolg, Reseller-ID(s) und Channel-Anzahl.
+- `sklera_remove_instance` – **Nur dynamische** Instanz aus dem lokalen Speicher entfernen. **Kein Sklera-API-Aufruf**, löscht nichts in Sklera.
+
+### Provisioning (NUR LESEND, ab 0.8.0)
+Basispfad `/data/api/provisioning`, Authentifizierung über den `apiToken`-Header, gleiche per-Instanz baseUrl/Token wie die Data API. **Es sind ausschließlich GET-Endpoints angebunden.** Die schreibenden/destruktiven Provisioning-Endpoints (`createAccount`, `edit`, `setExpired`, `changeScreenCount`, `deleteAccount`) sind bewusst **nicht** angebunden; zusätzlich verweigert der HTTP-Client jeden POST/PUT/DELETE gegen einen Provisioning-Pfad. Alle Tools unterstützen den Parameter `instance`.
+
+- `sklera_provisioning_list` – Accounts (Channels + User) auflisten via `GET /provisioning/list`; optionale Filter `username`, `userId`, `email`, `licenseType`, `channelName`. Je Account ist eine `channelId` enthalten.
+- `sklera_provisioning_get` – Einzelnen Account via `GET /provisioning/get/{channelId}` abrufen.
 
 ### Channels
 - `sklera_list_channels` – Alle zugänglichen Channels auflisten

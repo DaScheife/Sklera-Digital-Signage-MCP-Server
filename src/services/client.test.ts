@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { formatToolError, successText, resolveTimeoutMs, DEFAULT_HTTP_TIMEOUT_MS } from "./client.js";
+import {
+  formatToolError,
+  successText,
+  resolveTimeoutMs,
+  DEFAULT_HTTP_TIMEOUT_MS,
+  SkleraClient,
+} from "./client.js";
 
 describe("resolveTimeoutMs", () => {
   const original = process.env.SKLERA_HTTP_TIMEOUT_MS;
@@ -45,6 +51,21 @@ describe("successText", () => {
   it("handles primitive values", () => {
     expect(successText("hello")).toBe('"hello"');
     expect(successText(42)).toBe("42");
+  });
+});
+
+describe("SkleraClient provisioning write guard", () => {
+  const client = new SkleraClient({ baseUrl: "https://my.sklera.tv", apiToken: "TESTTOKEN" });
+
+  it("refuses POST/PUT/DELETE against any provisioning path", async () => {
+    await expect(client.post("/provisioning/createAccount", {})).rejects.toThrow(/read-only/);
+    await expect(client.put("/provisioning/edit/c1", {})).rejects.toThrow(/read-only/);
+    await expect(client.delete("/provisioning/deleteAccount/c1")).rejects.toThrow(/read-only/);
+  });
+
+  it("exposes a masked token and the base url", () => {
+    expect(client.baseUrlValue).toBe("https://my.sklera.tv");
+    expect(client.maskedToken()).toBe("…OKEN");
   });
 });
 

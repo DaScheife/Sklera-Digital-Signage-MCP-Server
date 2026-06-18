@@ -5,6 +5,40 @@ Alle nennenswerten Änderungen an diesem Projekt werden in dieser Datei dokument
 Das Format orientiert sich an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 die Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.8.0] - 2026-06-18
+
+### Hinzugefügt
+- **Laufzeit-Instanzverwaltung (Muster A):** Instanzen lassen sich zur Laufzeit
+  hinzufügen, auflisten, testen und entfernen – ohne Neustart und ohne erneutes
+  Verbinden. Neue Tools `sklera_add_instance`, `sklera_list_instances`,
+  `sklera_test_instance`, `sklera_remove_instance`. Dynamische Instanzen liegen
+  in einem **verschlüsselten** (AES-256-GCM) lokalen Speicher
+  (`src/services/instanceStore.ts`), der bei **jedem** Request gelesen und mit
+  den statischen Instanzen zusammengeführt wird (statisch hat Vorrang). Tokens
+  werden nie im Klartext geloggt oder ausgegeben (Maskierung auf die letzten 4
+  Zeichen). Neue Umgebungsvariablen `SKLERA_DYNAMIC_INSTANCES_FILE` und
+  `SKLERA_INSTANCE_SECRET`.
+  - `sklera_remove_instance` betrifft ausschließlich die lokale
+    Konnektor-Konfiguration und ruft **keine** Sklera-API auf.
+- **Provisioning API – NUR LESEND:** Neue Tools `sklera_provisioning_list`
+  (`GET /provisioning/list`, optionale Filter `username`/`userId`/`email`/
+  `licenseType`/`channelName`) und `sklera_provisioning_get`
+  (`GET /provisioning/get/{channelId}`). Beide unterstützen `instance`.
+
+### Sicherheit
+- **Provisioning ist technisch auf Lesezugriff beschränkt:** Es sind
+  ausschließlich GET-Endpoints angebunden; die schreibenden/destruktiven
+  Endpoints (`createAccount`, `edit`, `setExpired`, `changeScreenCount`,
+  `deleteAccount`) sind bewusst **nicht** vorhanden. Zusätzlich verweigert der
+  `SkleraClient` jeden POST/PUT/DELETE gegen einen Provisioning-Pfad
+  (`assertNotProvisioning`), sodass der Konnektor Accounts/Channels nicht
+  verändern kann.
+
+### Geändert
+- `SERVER_VERSION` und `package.json` auf `0.8.0`.
+- `ClientRegistry` konsultiert optional den dynamischen Instanz-Speicher
+  (`attachDynamicStore`, `resolve`/`names` berücksichtigen dynamische Instanzen).
+
 ## [0.7.0] - 2026-06-16
 
 ### Hinzugefügt

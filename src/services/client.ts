@@ -29,6 +29,29 @@ export class SkleraClient {
   private apiToken: string;
   private baseUrl: string;
 
+  /** Base URL of the target Sklera instance (no token), for listing tools. */
+  get baseUrlValue(): string {
+    return this.baseUrl;
+  }
+
+  /** Masked token (last 4 chars), for listing tools. Never reveals the token. */
+  maskedToken(): string {
+    return this.apiToken.length <= 4 ? "****" : `…${this.apiToken.slice(-4)}`;
+  }
+
+  /**
+   * Hard guard: the Provisioning API must be reachable read-only only. Any
+   * mutating method (POST/PUT/DELETE) against a provisioning path is refused so
+   * the connector is technically incapable of altering accounts or channels.
+   */
+  private assertNotProvisioning(method: string, path: string): void {
+    if (/provisioning/i.test(path)) {
+      throw new Error(
+        `Refusing ${method} on provisioning path "${path}": the Provisioning API is read-only in this connector.`
+      );
+    }
+  }
+
   constructor(config: SkleraConfig) {
     this.apiToken = config.apiToken;
     this.baseUrl = config.baseUrl;
@@ -63,6 +86,7 @@ export class SkleraClient {
   }
 
   async post<T>(path: string, body?: unknown, params?: Record<string, unknown>): Promise<T> {
+    this.assertNotProvisioning("POST", path);
     try {
       const res = await this.http.post<T>(path, body, {
         params,
@@ -80,6 +104,7 @@ export class SkleraClient {
   }
 
   async put<T>(path: string, body?: unknown): Promise<T> {
+    this.assertNotProvisioning("PUT", path);
     try {
       const res = await this.http.put<T>(path, body, {
         headers: { apiToken: this.apiToken },
@@ -93,6 +118,7 @@ export class SkleraClient {
   }
 
   async delete<T>(path: string, body?: unknown, params?: Record<string, unknown>): Promise<T> {
+    this.assertNotProvisioning("DELETE", path);
     try {
       const res = await this.http.delete<T>(path, {
         data: body,

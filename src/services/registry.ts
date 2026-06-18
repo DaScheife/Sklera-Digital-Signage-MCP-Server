@@ -1,4 +1,5 @@
 import { SkleraClient, SkleraConfig } from "./client.js";
+import type { DynamicInstanceStore } from "./instanceStore.js";
 
 /**
  * Configuration for a single named Sklera instance (domain + token).
@@ -53,6 +54,10 @@ export function buildRegistryFromInstances(
 export class ClientRegistry {
   private clients = new Map<string, SkleraClient>();
   private defaultName: string;
+  /** Optional runtime store for dynamically added instances (Muster A). */
+  private dynamicStore?: DynamicInstanceStore;
+  /** Per-registry cache of clients lazily built from the dynamic store. */
+  private dynamicClients = new Map<string, SkleraClient>();
 
   constructor(instances: Record<string, InstanceConfig>, defaultName: string) {
     for (const [name, cfg] of Object.entries(instances)) {
@@ -64,6 +69,16 @@ export class ClientRegistry {
     this.defaultName = defaultName;
   }
 
+  /**
+   * Attaches the shared dynamic-instance store so resolve()/names() also see
+   * instances added at runtime. Static instances always take precedence on a
+   * name conflict. Returns `this` for fluent wiring in buildServer().
+   */
+  attachDynamicStore(store?: DynamicInstanceStore): this {
+    this.dynamicStore = store;
+    return this;
+  }
+
   /** Returns the client for the default instance. */
   default(): SkleraClient {
     return this.clients.get(this.defaultName) as SkleraClient;
@@ -71,23 +86,62 @@ export class ClientRegistry {
 
   /**
    * Resolves a client by instance name. Falls back to the default instance
-   * when no name is supplied. Throws a descriptive error for unknown names.
+   * when no name is supplied. Static instances win over dynamic ones with the
+   * same name. Dynamic clients are built on demand from the store (read fresh
+   * per request) and cached for the lifetime of this registry. Throws a
+   * descriptive error for unknown names.
    */
   resolve(instance?: string): SkleraClient {
     if (!instance) return this.default();
-    const client = this.clients.get(instance);
-    if (!client) {
-      const available = [...this.clients.keys()].join(", ");
-      throw new Error(
-        `Unknown Sklera instance "${instance}". Configured instances: ${available}`
-      );
+
+    const staticClient = this.clients.get(instance);
+    if (staticClient) return staticClient;
+
+    const cfg = this.dynamicStore?.config(instance);
+    if (cfg) {
+      let client = this.dynamicClients.get(instance);
+      if (!client) {
+        client = new SkleraClient(cfg);
+        this.dynamicClients.set(instance, client);
+      }
+      return client;
     }
-    return client;
+
+    const available = this.names().join(", ");
+    throw new Error(
+      `Unknown Sklera instance "${instance}". Configured instances: ${available}`
+    );
   }
 
-  /** Lists the names of all configured instances. */
+  /**
+   * Lists the names of all configured instances: static plus dynamic (deduped,
+   * static precedence).
+   */
   names(): string[] {
+    const dynamic = this.dynamicStore?.names() ?? [];
+    return [...new Set([...this.clients.keys(), ...dynamic])];
+  }
+
+  /** Lists only the statically configured instance names. */
+  staticInstanceNames(): string[] {
     return [...this.clients.keys()];
+  }
+
+  /**
+   * Masked descriptors for the statically configured instances, for listing
+   * tools. Tokens are never returned in clear text.
+   */
+  staticInstances(): Array<{ name: string; baseUrl: string; tokenMasked: string }> {
+    return [...this.clients.entries()].map(([name, client]) => ({
+      name,
+      baseUrl: client.baseUrlValue,
+      tokenMasked: client.maskedToken(),
+    }));
+  }
+
+  /** Drops any cached dynamic client for the given name (used after removal). */
+  evictDynamicClient(name: string): void {
+    this.dynamicClients.delete(name);
   }
 
   /** Returns the name of the default instance. */
